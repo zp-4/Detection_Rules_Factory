@@ -1,0 +1,16 @@
+# RBAC Configuration
+# Simple user/role/team mapping
+users:
+  admin:
+    role: admin
+    team: security
+  reviewer1:
+    role: reviewer
+    team: security
+  contributor1:
+    role: contributor
+    team: soc
+  reader1:
+    role: reader
+    team: soc
+

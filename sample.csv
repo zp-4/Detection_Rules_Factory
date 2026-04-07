@@ -1,0 +1,11 @@
+Rule_Name,Logic_Query,Technique_ID,Tactic,Platform
+Suspicious PowerShell Webhook,ProcessName == 'powershell.exe' AND CommandLine contains 'webhook.site',T1567.004,Exfiltration,Windows
+AWS Root Login Without MFA,eventSource == 'signin.amazonaws.com' AND eventName == 'ConsoleLogin' AND additionalEventData.MFAUsed == 'No',T1078.004,Initial Access,AWS
+Linux Reverse Shell via Bash,ProcessName == 'bash' AND CommandLine matches '/dev/tcp/.*',T1059.004,Execution,Linux
+Okta MFA Reset Spike,eventType == 'user.mfa.factor.reset_all' | stats count() by actor.alternateId | where count > 5,T1098,Persistence,Okta
+Entra ID Admin Role Assigned,OperationName == 'Add member to role' AND TargetResources.ModifiedProperties.RoleDefinition.Name contains 'Admin',T1098.003,Persistence,Entra ID
+Network Exfiltration to Cloud Repo,DestinationIp matches 'github.com' AND OutboundBytes > 100000000,T1567.001,Exfiltration,Network
+EDR Suspicious LSASS Access,Process == 'lsass.exe' AND GrantedAccess == '0x1FFFFF',T1003.001,Credential Access,Windows
+Privileged Container Escape,event.category == 'process' AND process.args == '--privileged',T1611,Privilege Escalation,Linux
+Abnormal AWS S3 Bucket Public,eventName == 'PutBucketPolicy' AND requestParameters.Policy contains 'Principal": "*"',T1530,Collection,AWS
+Okta Login from New City,eventType == 'user.session.start' AND outcome.result == 'SUCCESS' AND client.geographicalContext.city != user.last_city,T1078.004,Initial Access,Okta

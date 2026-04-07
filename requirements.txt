@@ -1,0 +1,16 @@
+streamlit
+pandas
+mitreattack-python
+openai
+google-generativeai
+openpyxl
+requests
+stix2
+fpdf2
+sqlalchemy
+pyyaml
+pytest
+plotly
+PyPDF2
+beautifulsoup4
+

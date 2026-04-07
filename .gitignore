@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual environment
+venv/
+
+# Environment & secrets — do not commit (use .env.example for templates)
+.env
+.env.*
+!.env.example
+.flaskenv
+.envrc
+
+# Local SQLite database (created by init_db)
+usecase_factory.db
+*.db
+
+# Streamlit: version only config.toml; ignore secrets, AI keys, session cache, etc.
+.streamlit/*
+!.streamlit/config.toml
+
+# Session / local app data
+*.log
+
+# API keys & credentials (common filenames)
+*credentials*.json
+*secret*.json
+client_secret*.json
+*-credentials.json
+service-account*.json
+google-services.json
+.aws/credentials
+
+# Private keys & certs (do not commit private keys; .pub files are optional to track)
+*.pem
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+
+# Tests / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+Desktop.ini

@@ -1,0 +1,2 @@
+Rule_Name,Logic_Query,Technique_ID,Tactic,Platform
+Suspicious PowerShell Webhook,ProcessName == 'powershell.exe' AND CommandLine contains 'webhook.site',T1567.004,Exfiltration,Windows
