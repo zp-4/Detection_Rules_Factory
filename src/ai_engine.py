@@ -2,6 +2,19 @@ import openai
 import json
 from typing import Dict, Any, Optional, List
 
+
+def _ensure_ai_not_disabled() -> None:
+    try:
+        from services.feature_flags import ai_globally_disabled
+
+        if ai_globally_disabled():
+            raise RuntimeError(
+                "AI features are disabled by an administrator (config/feature_flags.yaml)."
+            )
+    except ImportError:
+        pass
+
+
 class AIEngine:
     def __init__(self, api_key: str, provider: str = "openai", base_url: Optional[str] = None, model_name: Optional[str] = None):
         """
@@ -18,6 +31,7 @@ class AIEngine:
                         - LM Studio: "http://localhost:1234/v1"
             model_name: Custom model name (optional, defaults based on provider)
         """
+        _ensure_ai_not_disabled()
         self.provider = provider.lower()
         self.model_name = model_name
         self.base_url = base_url

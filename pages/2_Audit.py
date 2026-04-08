@@ -9,7 +9,7 @@ from fpdf.enums import TableCellFillMode, XPos, YPos
 from src.data_ingestion import load_data, standardize_columns
 from src.mitre_engine import MitreEngine
 from src.ai_engine import AIEngine
-from services.auth import get_current_user, login, has_permission
+from services.auth import get_current_user, has_permission, require_sign_in
 from db.repo import RuleChangeLogRepository
 from db.session import SessionLocal
 from db.repo import UseCaseRepository, RuleRepository
@@ -27,28 +27,8 @@ from utils.ai_config import (
 # Restore session state
 restore_session_state()
 
-# Authentication check
+require_sign_in("the Audit page")
 username = get_current_user()
-if not username:
-    st.warning("Please login to access Audit")
-    st.divider()
-    
-    # Login form
-    with st.form("login_form"):
-        st.subheader("Login")
-        login_username = st.text_input("Username", placeholder="Enter your username")
-        if st.form_submit_button("Login", type="primary"):
-            if login_username:
-                if login(login_username):
-                    st.success(f"Logged in as {login_username}")
-                    st.rerun()
-                else:
-                    st.error("Invalid username. Please check your credentials.")
-            else:
-                st.error("Please enter a username")
-    
-    st.info("💡 **Demo users:** admin, reviewer1, contributor1, reader1")
-    st.stop()
 
 # Import PDF generation function
 def generate_pdf_report(results, mitre_info):

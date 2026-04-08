@@ -30,6 +30,13 @@ class UseCase(Base):
     tuning_guidance = Column(Text)
     
     version = Column(Integer, default=1)
+    # Review queue (use case in status=review)
+    review_priority = Column(Integer, default=3)  # 1 = highest
+    review_sla_days = Column(Integer, nullable=True)
+    review_assignee = Column(String(100), nullable=True)
+    review_started_at = Column(DateTime, nullable=True)
+    review_due_at = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -63,6 +70,11 @@ class RuleImplementation(Base):
     last_mapping_analysis = Column(JSON)  # Last mapping analysis results
     enabled = Column(Boolean, default=True, index=True)  # Whether the rule is enabled/active
     version = Column(Integer, default=1)
+    # External ITSM tickets: list of {system, key?, url?}
+    ticket_refs = Column(JSON, nullable=True)
+    # production | staging | test | pilot | paused | retired
+    operational_status = Column(String(32), default="production", index=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

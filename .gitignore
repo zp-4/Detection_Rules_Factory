@@ -11,6 +11,7 @@ build/
 
 # Virtual environment
 venv/
+.venv/
 
 # Environment & secrets — do not commit (use .env.example for templates)
 .env
@@ -51,7 +52,11 @@ id_ed25519
 .coverage
 htmlcov/
 
-# IDE
+# IDE — version shared Cursor rules; ignore the rest of .cursor
+.cursor/*
+!.cursor/
+!.cursor/rules/
+!.cursor/rules/**
 .idea/
 .vscode/
 *.swp
@@ -60,3 +65,6 @@ htmlcov/
 # OS
 Thumbs.db
 Desktop.ini
+
+# Local contributor roadmap (not for version control)
+FEATURE_ROADMAP_LOCAL.md

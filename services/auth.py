@@ -1,8 +1,10 @@
 """Simple RBAC authentication service."""
 import yaml
 import os
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 import streamlit as st
+
+from utils.password_hashing import verify_password
 
 
 # Default roles and permissions
@@ -76,6 +78,28 @@ def get_user_team(username: Optional[str] = None) -> Optional[str]:
     return None
 
 
+def get_user_entry(username: str) -> Optional[Dict[str, Any]]:
+    """Return the RBAC dict for a username, or None."""
+    if not username:
+        return None
+    config = load_rbac_config()
+    entry = config.get("users", {}).get(username)
+    if entry is None:
+        return None
+    if not isinstance(entry, dict):
+        return None
+    return entry
+
+
+def user_has_password(username: str) -> bool:
+    """True if this account requires a password (password_hash set in RBAC)."""
+    entry = get_user_entry(username)
+    if not entry:
+        return False
+    ph = entry.get("password_hash")
+    return bool(ph and str(ph).strip())
+
+
 def has_permission(permission: str, username: Optional[str] = None) -> bool:
     """Check if user has permission."""
     role = get_user_role(username)
@@ -98,18 +122,43 @@ def require_permission(permission: str):
     return decorator
 
 
+SIGN_IN_PAGE = "pages/0_Login.py"
+
+
+def require_sign_in(page_description: str = "this page") -> None:
+    """
+    If the user is not logged in, show a gate with a link to the sign-in
+    portal and stop rendering the rest of the page.
+    """
+    if get_current_user():
+        return
+    st.warning(f"Please sign in to access {page_description}.")
+    if st.button("Open sign-in portal", type="primary"):
+        st.switch_page(SIGN_IN_PAGE)
+    st.caption("Sign in via the portal (see `config/rbac.yaml`; optional passwords).")
+    st.stop()
+
+
 def login(username: str, password: str = "") -> bool:
     """
-    Simple login (MVP - no real password check).
-    In production, implement proper authentication.
+    Authenticate against RBAC config. If the user has ``password_hash`` set
+    (see ``scripts/hash_password.py``), the password must match; otherwise
+    username-only login remains allowed (demo mode).
     """
     config = load_rbac_config()
-    if username in config.get("users", {}):
-        st.session_state["username"] = username
-        st.session_state["user_role"] = get_user_role(username)
-        st.session_state["user_team"] = get_user_team(username)
-        return True
-    return False
+    users = config.get("users", {})
+    if username not in users:
+        return False
+    entry = get_user_entry(username)
+    if entry:
+        ph = entry.get("password_hash")
+        if ph and str(ph).strip():
+            if not verify_password(password, str(ph).strip()):
+                return False
+    st.session_state["username"] = username
+    st.session_state["user_role"] = get_user_role(username)
+    st.session_state["user_team"] = get_user_team(username)
+    return True
 
 
 def logout():

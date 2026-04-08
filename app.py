@@ -12,7 +12,8 @@ if sys.platform == 'win32':
         sys.stderr.reconfigure(encoding='utf-8')
 
 import streamlit as st
-from services.auth import get_current_user, login, logout
+from services.auth import get_current_user, logout
+from services.feature_flags import maintenance_message
 from utils.session_persistence import restore_session_state, persist_session_state
 
 # Restore session state on page load
@@ -25,30 +26,30 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Sidebar login
-st.sidebar.title("🏭 Detection Rules Factory")
-
 username = get_current_user()
-
 if not username:
-    st.sidebar.subheader("Login")
-    login_username = st.sidebar.text_input("Username")
-    if st.sidebar.button("Login"):
-        if login(login_username):
-            st.sidebar.success(f"Logged in as {login_username}")
-            st.rerun()
-        else:
-            st.sidebar.error("Invalid username")
-else:
-    st.sidebar.success(f"Logged in as: **{username}**")
-    st.sidebar.caption(f"Role: {st.session_state.get('user_role', 'N/A')}")
-    st.sidebar.caption(f"Team: {st.session_state.get('user_team', 'N/A')}")
-    
-    if st.sidebar.button("Logout"):
-        logout()
-        st.rerun()
+    st.switch_page("pages/0_Login.py")
+
+# Sidebar (authenticated)
+st.sidebar.title("🏭 Detection Rules Factory")
+_msg = maintenance_message()
+if _msg:
+    st.sidebar.warning(_msg)
+st.sidebar.success(f"Logged in as: **{username}**")
+st.sidebar.caption(f"Role: {st.session_state.get('user_role', 'N/A')}")
+st.sidebar.caption(f"Team: {st.session_state.get('user_team', 'N/A')}")
+if st.sidebar.button("Sign out"):
+    logout()
+    st.rerun()
+if st.sidebar.button("My workspace"):
+    st.switch_page("pages/10_My_Workspace.py")
+if st.sidebar.button("My profile"):
+    st.switch_page("pages/9_My_Profile.py")
 
 # Main content
+_banner = maintenance_message()
+if _banner:
+    st.warning(_banner)
 st.title("🏭 Detection Rules Factory")
 st.markdown("""
 **A comprehensive platform for managing SOC detection rules and MITRE ATT&CK coverage analysis.**
@@ -67,35 +68,50 @@ Use the sidebar to navigate between pages, or select from the pages below.
 """)
 
 # Quick links
-col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
+col1, col2, col3, col4, col5, col6, col7, col8 = st.columns(8)
 
 with col1:
+    if st.button("📌 Workspace", width='stretch'):
+        st.switch_page("pages/10_My_Workspace.py")
+
+with col2:
     if st.button("📋 Rules", width='stretch'):
         st.switch_page("pages/1_Use_Cases.py")
 
-with col2:
+with col3:
     if st.button("🛡️ Audit", width='stretch'):
         st.switch_page("pages/2_Audit.py")
 
-with col3:
+with col4:
     if st.button("🎯 Mapping", width='stretch'):
         st.switch_page("pages/3_Mapping.py")
 
-with col4:
+with col5:
     if st.button("📊 Dashboard", width='stretch'):
         st.switch_page("pages/4_Dashboard_MITRE.py")
 
-with col5:
+with col6:
     if st.button("🎯 Groups", width='stretch'):
         st.switch_page("pages/5_Group_Coverage.py")
 
-with col6:
+with col7:
     if st.button("🔍 CTI", width='stretch'):
         st.switch_page("pages/6_CTI_Detection.py")
 
-with col7:
+with col8:
     if st.button("⚙️ Admin", width='stretch'):
         st.switch_page("pages/8_Admin.py")
+
+r1, r2, r3, r4 = st.columns([1, 1, 1, 3])
+with r1:
+    if st.button("🔄 Use case workflow", width="stretch"):
+        st.switch_page("pages/11_Use_Case_Workflow.py")
+with r2:
+    if st.button("📑 Rule version diff", width="stretch"):
+        st.switch_page("pages/12_Rule_Version_Diff.py")
+with r3:
+    if st.button("🎯 MITRE coverage hub", width="stretch"):
+        st.switch_page("pages/13_MITRE_Coverage_Hub.py")
 
 st.divider()
 

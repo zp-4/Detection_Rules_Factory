@@ -8,34 +8,19 @@ from db.models import (
     RuleImplementation, RuleChangeLog, UseCase, 
     AiAuditResult, OfflineAuditResult, MappingReview
 )
-from services.auth import get_current_user, has_permission, login, load_rbac_config
+from services.auth import get_current_user, has_permission, load_rbac_config, require_sign_in
+from services.feature_flags import load_feature_flags, save_feature_flags
 from services.mitre_coverage import get_mitre_engine
+from services.quota import set_quota_limit
+from db.repo import QuotaRepository
+from utils.time import get_current_period
 
 st.set_page_config(page_title="Admin", page_icon="⚙️", layout="wide")
 
-st.title("⚙️ Administration")
-
+require_sign_in("the Admin page")
 username = get_current_user()
-if not username:
-    st.warning("Please login to access the Admin page")
-    st.divider()
-    
-    # Login form
-    with st.form("login_form"):
-        st.subheader("Login")
-        login_username = st.text_input("Username", placeholder="Enter your username")
-        if st.form_submit_button("Login", type="primary"):
-            if login_username:
-                if login(login_username):
-                    st.success(f"Logged in as {login_username}")
-                    st.rerun()
-                else:
-                    st.error("Invalid username. Please check your credentials.")
-            else:
-                st.error("Please enter a username")
-    
-    st.info("💡 **Demo users:** admin, reviewer1, contributor1, reader1")
-    st.stop()
+
+st.title("⚙️ Administration")
 
 if not has_permission("admin"):
     st.error("Admin access required")
@@ -43,7 +28,15 @@ if not has_permission("admin"):
 
 db = SessionLocal()
 try:
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 System Statistics", "📈 Rule Quality Metrics", "🔒 RBAC", "📝 README Editor"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+        [
+            "📊 System Statistics",
+            "📈 Rule Quality Metrics",
+            "🔒 RBAC",
+            "🎛️ Platform",
+            "📝 README Editor",
+        ]
+    )
 
     with tab1:
         col_header, col_refresh = st.columns([3, 1])
@@ -312,6 +305,66 @@ try:
                 st.dataframe(df, width='stretch', hide_index=True)
 
     with tab4:
+        st.subheader("🎛️ Platform")
+        st.caption("Operational switches and per-team AI run quotas for the current month.")
+
+        flags = load_feature_flags()
+        with st.form("feature_flags_form"):
+            maint = st.text_area(
+                "Maintenance banner (empty = off)",
+                value=str(flags.get("maintenance_message") or ""),
+                help="Shown on the home page and sidebar when non-empty.",
+            )
+            disable_ai = st.checkbox(
+                "Disable AI globally",
+                value=bool(flags.get("disable_ai_globally")),
+                help="New AIEngine instances will raise; turn off for maintenance or policy.",
+            )
+            if st.form_submit_button("Save platform settings", type="primary"):
+                save_feature_flags(
+                    {
+                        "maintenance_message": maint.strip(),
+                        "disable_ai_globally": disable_ai,
+                    }
+                )
+                st.success("Platform settings saved to `config/feature_flags.yaml`.")
+                st.rerun()
+
+        st.divider()
+        st.subheader("AI quota by team (current period)")
+        period = get_current_period()
+        st.caption(f"Period: **{period}** (YYYY-MM, UTC)")
+
+        teams = sorted(
+            {
+                (u.get("team") or "").strip()
+                for u in load_rbac_config().get("users", {}).values()
+                if isinstance(u, dict) and (u.get("team") or "").strip()
+            }
+        )
+        if not teams:
+            teams = ["security", "soc"]
+
+        for team in teams:
+            q = QuotaRepository.get_or_create(db, period, team)
+            c1, c2, c3 = st.columns([2, 1, 1])
+            with c1:
+                st.write(f"**{team}** — used **{q.runs_used}** / limit **{q.runs_limit}**")
+            with c2:
+                new_lim = st.number_input(
+                    f"Limit ({team})",
+                    min_value=0,
+                    max_value=1_000_000,
+                    value=int(q.runs_limit),
+                    key=f"quota_lim_{team}",
+                )
+            with c3:
+                if st.button("Apply", key=f"quota_apply_{team}"):
+                    set_quota_limit(db, team, int(new_lim))
+                    st.success(f"Updated limit for {team}")
+                    st.rerun()
+
+    with tab5:
         st.subheader("📝 README Editor")
         st.info("Edit the README.md file directly from this interface. Changes are saved immediately.")
         

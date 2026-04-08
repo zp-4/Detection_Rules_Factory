@@ -8,35 +8,15 @@ from db.session import SessionLocal
 from db.models import RuleImplementation, UseCase
 from db.repo import UseCaseRepository, RuleRepository
 from services.mitre_coverage import get_mitre_engine
-from services.auth import get_current_user, login
+from services.auth import get_current_user, require_sign_in
 from datetime import datetime, timedelta
 import json
 from collections import Counter, defaultdict
 
 st.set_page_config(page_title="MITRE Dashboard", page_icon="📊", layout="wide")
 
-# Authentication check
+require_sign_in("the MITRE Dashboard")
 username = get_current_user()
-if not username:
-    st.warning("Please login to access the Dashboard")
-    st.divider()
-    
-    # Login form
-    with st.form("login_form"):
-        st.subheader("Login")
-        login_username = st.text_input("Username", placeholder="Enter your username")
-        if st.form_submit_button("Login", type="primary"):
-            if login_username:
-                if login(login_username):
-                    st.success(f"Logged in as {login_username}")
-                    st.rerun()
-                else:
-                    st.error("Invalid username. Please check your credentials.")
-            else:
-                st.error("Please enter a username")
-    
-    st.info("💡 **Demo users:** admin, reviewer1, contributor1, reader1")
-    st.stop()
 
 # Custom CSS for SOC-style dashboard
 st.markdown("""

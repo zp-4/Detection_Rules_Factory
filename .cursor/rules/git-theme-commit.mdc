@@ -1,0 +1,13 @@
+---
+alwaysApply: true
+---
+
+## Git: end of each development theme
+
+When a **roadmap theme** or agreed feature batch is **complete** (implemented, tests green where applicable):
+
+1. **`git add`** the changes for that theme (or the whole working tree if the theme was the only active work).
+2. **`git commit`** with a message in **English**, imperative or conventional style (`feat:`, `fix:`, …). The message must describe **what shipped** (product/technical), not the authoring environment or tooling brands.
+3. **`git push`** to the tracked remote branch (typically `origin` and the current branch, e.g. `main`).
+
+Do not leave completed themes only on disk: the default workflow is **commit then push** before moving to the next theme.

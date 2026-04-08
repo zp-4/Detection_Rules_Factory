@@ -1,0 +1,14 @@
+# Custom MITRE scopes and CTI campaigns (editable from MITRE Coverage Hub page)
+scopes:
+  enterprise_full:
+    name: Full enterprise matrix
+    # Empty list = use full Enterprise technique set from local ATT&CK bundle
+    technique_ids: []
+
+campaigns:
+  - id: example_cti_bundle
+    name: Example CTI technique bundle
+    technique_ids:
+      - T1566.001
+      - T1059.001
+      - T1078

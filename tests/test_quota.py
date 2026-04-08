@@ -1,10 +1,9 @@
 """Tests for quota management."""
+import uuid
+
 import pytest
 from db.session import SessionLocal, init_db
 from services.quota import check_quota, consume_quota, set_quota_limit
-from utils.time import get_current_period
-
-
 @pytest.fixture
 def db():
     """Create test database session."""
@@ -14,10 +13,13 @@ def db():
     db.close()
 
 
+def _unique_team() -> str:
+    return f"test_team_{uuid.uuid4().hex[:12]}"
+
+
 def test_check_quota(db):
     """Test quota checking."""
-    period = get_current_period()
-    team = "test_team"
+    team = _unique_team()
     
     has_quota, used, limit = check_quota(db, team)
     
@@ -29,7 +31,7 @@ def test_check_quota(db):
 
 def test_consume_quota(db):
     """Test quota consumption."""
-    team = "test_team"
+    team = _unique_team()
     
     # Consume quota
     result1 = consume_quota(db, team)
@@ -43,7 +45,7 @@ def test_consume_quota(db):
 
 def test_quota_limit(db):
     """Test quota limit setting."""
-    team = "test_team"
+    team = _unique_team()
     new_limit = 5
     
     set_quota_limit(db, team, new_limit)

@@ -330,6 +330,8 @@ class RuleChangeLogRepository:
             "last_mapping_analysis": rule.last_mapping_analysis,
             "enabled": rule.enabled,
             "version": rule.version,
+            "ticket_refs": getattr(rule, "ticket_refs", None),
+            "operational_status": getattr(rule, "operational_status", None) or "production",
             "created_at": rule.created_at.isoformat() if rule.created_at else None,
             "updated_at": rule.updated_at.isoformat() if rule.updated_at else None,
         }
@@ -367,15 +369,29 @@ class RuleChangeLogRepository:
     ) -> RuleChangeLog:
         """Log a rule update with field-level changes."""
         new_state = RuleChangeLogRepository._rule_to_dict(rule)
-        
+
         # Calculate changed fields
-        changed_fields = {}
+        changed_fields: Dict[str, Any] = {}
         for key in new_state:
             old_val = previous_state.get(key)
             new_val = new_state.get(key)
             if old_val != new_val:
                 changed_fields[key] = {"old": old_val, "new": new_val}
-        
+
+        # Bump business version when meaningful fields change (not cache-only)
+        meta_only = {"updated_at", "last_audit_results", "last_mapping_analysis"}
+        if any(k not in meta_only for k in changed_fields):
+            rule.version = (rule.version or 1) + 1
+            db.commit()
+            db.refresh(rule)
+            new_state = RuleChangeLogRepository._rule_to_dict(rule)
+            changed_fields = {}
+            for key in new_state:
+                old_val = previous_state.get(key)
+                new_val = new_state.get(key)
+                if old_val != new_val:
+                    changed_fields[key] = {"old": old_val, "new": new_val}
+
         log_entry = RuleChangeLog(
             rule_id=rule.id,
             changed_by=changed_by,
@@ -514,6 +530,8 @@ class RuleChangeLogRepository:
                 last_audit_results=prev.get("last_audit_results"),
                 last_mapping_analysis=prev.get("last_mapping_analysis"),
                 enabled=prev.get("enabled", True),
+                ticket_refs=prev.get("ticket_refs"),
+                operational_status=prev.get("operational_status") or "production",
                 version=(prev.get("version", 1) or 1) + 1
             )
             db.add(restored_rule)
@@ -565,6 +583,10 @@ class RuleChangeLogRepository:
             rule.last_audit_results = prev.get("last_audit_results")
             rule.last_mapping_analysis = prev.get("last_mapping_analysis")
             rule.enabled = prev.get("enabled", True)
+            if hasattr(rule, "ticket_refs"):
+                rule.ticket_refs = prev.get("ticket_refs")
+            if hasattr(rule, "operational_status"):
+                rule.operational_status = prev.get("operational_status") or "production"
             rule.version = (rule.version or 1) + 1
             rule.updated_at = datetime.utcnow()
             

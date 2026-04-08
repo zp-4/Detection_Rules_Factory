@@ -23,7 +23,7 @@ from db.session import SessionLocal
 from db.models import RuleImplementation, UseCase
 from db.repo import RuleRepository, UseCaseRepository
 from src.ai_engine import AIEngine
-from services.auth import get_current_user, login, has_permission
+from services.auth import get_current_user, has_permission, require_sign_in
 from db.repo import RuleChangeLogRepository
 from utils.hashing import compute_rule_hash
 from sqlalchemy.orm.attributes import flag_modified
@@ -34,28 +34,8 @@ st.set_page_config(
     layout="wide"
 )
 
-# Authentication check
+require_sign_in("CTI Detection Opportunity")
 username = get_current_user()
-if not username:
-    st.warning("Please login to access CTI Detection Opportunity")
-    st.divider()
-    
-    # Login form
-    with st.form("login_form_cti"):
-        st.subheader("Login")
-        login_username = st.text_input("Username", placeholder="Enter your username")
-        if st.form_submit_button("Login", type="primary"):
-            if login_username:
-                if login(login_username):
-                    st.success(f"Logged in as {login_username}")
-                    st.rerun()
-                else:
-                    st.error("Invalid username. Please check your credentials.")
-            else:
-                st.error("Please enter a username")
-    
-    st.info("💡 **Demo users:** admin, reviewer1, contributor1, reader1")
-    st.stop()
 
 st.title("🔍 CTI Detection Opportunity")
 st.markdown("""

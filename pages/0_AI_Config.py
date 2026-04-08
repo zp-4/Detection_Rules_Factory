@@ -8,7 +8,7 @@ from utils.ai_config import (
     GEMINI_MODEL_OPTIONS,
     CUSTOM_MODEL_LABEL,
 )
-from services.auth import get_current_user, login
+from services.auth import get_current_user, require_sign_in
 
 st.set_page_config(
     page_title="AI Configuration",
@@ -16,28 +16,8 @@ st.set_page_config(
     layout="wide"
 )
 
-# Authentication check
+require_sign_in("AI Configuration")
 username = get_current_user()
-if not username:
-    st.warning("Please login to access AI Configuration")
-    st.divider()
-    
-    # Login form
-    with st.form("login_form"):
-        st.subheader("Login")
-        login_username = st.text_input("Username", placeholder="Enter your username")
-        if st.form_submit_button("Login", type="primary"):
-            if login_username:
-                if login(login_username):
-                    st.success(f"Logged in as {login_username}")
-                    st.rerun()
-                else:
-                    st.error("Invalid username. Please check your credentials.")
-            else:
-                st.error("Please enter a username")
-    
-    st.info("💡 **Demo users:** admin, reviewer1, contributor1, reader1")
-    st.stop()
 
 st.title("🤖 AI Configuration")
 
