@@ -3,7 +3,8 @@ import streamlit as st
 from db.session import SessionLocal
 from db.models import RuleImplementation
 from db.repo import RuleChangeLogRepository, RuleRepository
-from services.auth import has_permission, require_sign_in
+from services.auth import get_current_user, has_permission, require_sign_in
+from utils.app_navigation import render_app_sidebar
 from services.rule_snapshot import mitre_snapshot_text
 from services.rule_playbook import format_playbook_for_diff, normalize_playbook
 from utils.diff_html import generate_colored_diff, generate_side_by_side_diff
@@ -18,6 +19,7 @@ st.set_page_config(
 )
 
 require_sign_in("Rule version diff")
+render_app_sidebar(get_current_user() or "")
 
 if not has_permission("read"):
     st.error("Read permission required.")

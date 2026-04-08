@@ -5,6 +5,7 @@ from db.session import SessionLocal
 from db.models import RuleChangeLog, RuleImplementation
 from db.repo import RuleChangeLogRepository, RuleRepository
 from services.auth import get_current_user, has_permission, require_sign_in
+from utils.app_navigation import render_app_sidebar
 from utils.diff_html import generate_colored_diff, generate_side_by_side_diff
 
 st.set_page_config(
@@ -15,6 +16,7 @@ st.set_page_config(
 
 require_sign_in("the Audit Trail")
 username = get_current_user()
+render_app_sidebar(username)
 
 st.title("📜 Audit Trail")
 st.markdown("""
@@ -378,6 +380,3 @@ finally:
     db.close()
 
 # Sidebar admin link
-st.sidebar.divider()
-if st.sidebar.button("⚙️ Admin", width='stretch'):
-    st.switch_page("pages/8_Admin.py")

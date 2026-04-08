@@ -9,6 +9,7 @@ from db.models import RuleImplementation
 from db.repo import RuleChangeLogRepository, RuleRepository
 from db.session import SessionLocal
 from services.auth import get_current_user, has_permission, require_sign_in
+from utils.app_navigation import render_app_sidebar
 from services.exec_metrics import collect_executive_metrics
 from services.exec_report_pdf import build_executive_pdf
 from services.governance_config import load_governance_config, save_governance_config
@@ -20,6 +21,7 @@ st.set_page_config(page_title="Governance", page_icon="📦", layout="wide")
 
 require_sign_in("Governance")
 username = get_current_user() or ""
+render_app_sidebar(username)
 
 if not has_permission("read"):
     st.error("Read permission required.")

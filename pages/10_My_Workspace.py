@@ -13,6 +13,7 @@ from services.user_workspace import (
     workspace_summary,
 )
 from utils.session_persistence import restore_session_state
+from utils.app_navigation import render_app_sidebar
 
 restore_session_state()
 
@@ -24,6 +25,7 @@ st.set_page_config(
 
 require_sign_in("My workspace")
 username = get_current_user()
+render_app_sidebar(username)
 
 st.title("📌 My workspace")
 st.caption("Use cases where you are owner or reviewer, and rules that may need your attention.")

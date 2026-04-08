@@ -3,7 +3,8 @@ import streamlit as st
 
 from db.session import SessionLocal
 from src.ai_engine import AIEngine
-from services.auth import has_permission, require_sign_in
+from services.auth import get_current_user, has_permission, require_sign_in
+from utils.app_navigation import render_app_sidebar
 from services.rule_draft_assistant import run_rule_draft_assistant
 from utils.ai_config import (
     get_ai_config,
@@ -23,6 +24,7 @@ st.set_page_config(
 )
 
 require_sign_in("Rule draft assistant")
+render_app_sidebar(get_current_user() or "")
 
 if not has_permission("trigger_ai"):
     st.error("**trigger_ai** permission is required (e.g. reviewer or admin).")

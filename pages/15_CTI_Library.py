@@ -6,6 +6,7 @@ from db.models import RuleImplementation
 from db.repo import CtiLibraryRepository, RuleChangeLogRepository, RuleRepository
 from db.session import SessionLocal
 from services.auth import get_current_user, has_permission, require_sign_in
+from utils.app_navigation import render_app_sidebar
 from services.cti_ioc import parse_iocs_from_text
 from services.cti_refs import build_cti_refs_from_entry_ids, normalize_cti_refs
 from utils.session_persistence import restore_session_state
@@ -16,6 +17,7 @@ st.set_page_config(page_title="CTI library", page_icon="📚", layout="wide")
 
 require_sign_in("CTI library")
 username = get_current_user() or ""
+render_app_sidebar(username)
 
 if not has_permission("read"):
     st.error("Read permission required.")

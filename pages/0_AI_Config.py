@@ -9,6 +9,7 @@ from utils.ai_config import (
     CUSTOM_MODEL_LABEL,
 )
 from services.auth import get_current_user, require_sign_in
+from utils.app_navigation import render_app_sidebar
 
 st.set_page_config(
     page_title="AI Configuration",
@@ -18,6 +19,7 @@ st.set_page_config(
 
 require_sign_in("AI Configuration")
 username = get_current_user()
+render_app_sidebar(username)
 
 st.title("🤖 AI Configuration")
 

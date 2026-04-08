@@ -11,6 +11,7 @@ from services.auth import (
     user_has_password,
 )
 from services.user_workspace import workspace_summary
+from utils.app_navigation import render_app_sidebar
 
 restore_session_state()
 
@@ -22,6 +23,7 @@ st.set_page_config(
 
 require_sign_in("your profile")
 username = get_current_user()
+render_app_sidebar(username)
 
 st.title("👤 My profile")
 st.caption("Overview of your account in this workspace (demo RBAC).")

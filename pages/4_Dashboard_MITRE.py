@@ -9,6 +9,7 @@ from db.models import RuleImplementation, UseCase
 from db.repo import UseCaseRepository, RuleRepository
 from services.mitre_coverage import get_mitre_engine
 from services.auth import get_current_user, require_sign_in
+from utils.app_navigation import render_app_sidebar
 from services.exec_metrics import collect_executive_metrics
 from services.exec_report_pdf import build_executive_pdf
 from datetime import datetime, timedelta, timezone
@@ -19,6 +20,7 @@ st.set_page_config(page_title="MITRE Dashboard", page_icon="📊", layout="wide"
 
 require_sign_in("the MITRE Dashboard")
 username = get_current_user()
+render_app_sidebar(username)
 
 # Custom CSS for SOC-style dashboard
 st.markdown("""
@@ -587,8 +589,3 @@ try:
 
 finally:
     db.close()
-
-# Add admin link at bottom of sidebar
-st.sidebar.divider()
-if st.sidebar.button("⚙️ Admin", width='stretch'):
-    st.switch_page("pages/8_Admin.py")

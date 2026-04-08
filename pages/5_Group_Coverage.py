@@ -7,6 +7,7 @@ from db.session import SessionLocal
 from db.models import RuleImplementation
 from src.mitre_engine import MitreEngine, list_software_for_group
 from services.auth import get_current_user, require_sign_in
+from utils.app_navigation import render_app_sidebar
 
 st.set_page_config(
     page_title="Group Coverage Analysis",
@@ -16,6 +17,7 @@ st.set_page_config(
 
 require_sign_in("Group Coverage Analysis")
 username = get_current_user()
+render_app_sidebar(username)
 
 st.title("🎯 MITRE Group Coverage Analysis")
 st.markdown("""
@@ -395,8 +397,3 @@ try:
 
 finally:
     db.close()
-
-# Add admin link at bottom of sidebar
-st.sidebar.divider()
-if st.sidebar.button("⚙️ Admin", width='stretch'):
-    st.switch_page("pages/8_Admin.py")

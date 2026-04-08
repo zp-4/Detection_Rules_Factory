@@ -10,6 +10,7 @@ from services.auth import get_current_user, has_permission, require_sign_in
 from services.review_schedule import review_due_at_from_start
 from services.webhooks import emit_use_case_approved
 from utils.session_persistence import restore_session_state
+from utils.app_navigation import render_app_sidebar
 
 restore_session_state()
 
@@ -20,6 +21,8 @@ st.set_page_config(
 )
 
 require_sign_in("Use case workflow")
+username = get_current_user()
+render_app_sidebar(username)
 
 if not has_permission("update"):
     st.error("You need **update** permission to change use case status.")

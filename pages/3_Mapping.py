@@ -9,6 +9,7 @@ from src.ai_engine import AIEngine
 from src.mitre_engine import MitreEngine
 from sqlalchemy.orm.attributes import flag_modified
 from services.auth import get_current_user, has_permission, require_sign_in
+from utils.app_navigation import render_app_sidebar
 from db.repo import RuleChangeLogRepository
 from services.webhooks import emit_mapping_changed
 
@@ -20,6 +21,7 @@ st.set_page_config(
 
 require_sign_in("MITRE Mapping Analysis")
 username = get_current_user()
+render_app_sidebar(username)
 
 st.title("🎯 MITRE Mapping Analysis")
 st.markdown("""
@@ -725,8 +727,3 @@ try:
 
 finally:
     db.close()
-
-# Add admin link at bottom of sidebar
-st.sidebar.divider()
-if st.sidebar.button("⚙️ Admin", width='stretch'):
-    st.switch_page("pages/8_Admin.py")

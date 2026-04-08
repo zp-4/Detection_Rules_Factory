@@ -16,6 +16,7 @@ from services.comment_notifications import add_comment_with_notifications
 from services.webhooks import emit_mapping_changed
 from utils.hashing import compute_rule_hash
 from utils.session_persistence import restore_session_state, persist_session_state
+from utils.app_navigation import render_app_sidebar
 
 # Restore session state
 restore_session_state()
@@ -27,6 +28,7 @@ st.markdown("Manage and filter your detection rules. Select rules to run MITRE A
 
 require_sign_in("the Detection Rules catalogue")
 username = get_current_user()
+render_app_sidebar(username)
 
 # Database session
 db = SessionLocal()
@@ -1418,9 +1420,3 @@ try:
                 st.markdown("---")
 finally:
     db.close()
-
-# Add admin link at bottom of sidebar
-st.sidebar.divider()
-if st.sidebar.button("⚙️ Admin", width='stretch'):
-    st.switch_page("pages/8_Admin.py")
-

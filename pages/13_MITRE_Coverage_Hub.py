@@ -8,7 +8,8 @@ import yaml
 
 from db.session import SessionLocal
 from db.models import RuleImplementation
-from services.auth import has_permission, require_sign_in
+from services.auth import get_current_user, has_permission, require_sign_in
+from utils.app_navigation import render_app_sidebar
 from services.mitre_coverage import get_mitre_engine
 from services.mitre_catalog import collect_covered_technique_ids
 from services.mitre_coverage_config import (
@@ -29,6 +30,7 @@ st.set_page_config(
 )
 
 require_sign_in("MITRE coverage hub")
+render_app_sidebar(get_current_user() or "")
 if not has_permission("read"):
     st.error("Read permission required.")
     st.stop()

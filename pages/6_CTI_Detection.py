@@ -24,6 +24,7 @@ from db.models import RuleImplementation, UseCase
 from db.repo import RuleRepository, UseCaseRepository, CtiLibraryRepository
 from src.ai_engine import AIEngine
 from services.auth import get_current_user, has_permission, require_sign_in
+from utils.app_navigation import render_app_sidebar
 from db.repo import RuleChangeLogRepository
 from services.cti_refs import build_cti_refs_from_entry_ids
 from utils.hashing import compute_rule_hash
@@ -37,6 +38,7 @@ st.set_page_config(
 
 require_sign_in("CTI Detection Opportunity")
 username = get_current_user()
+render_app_sidebar(username)
 
 st.title("🔍 CTI Detection Opportunity")
 st.markdown("""
@@ -609,8 +611,3 @@ with tab2:
             )
             if result.get("summary"):
                 st.info(f"📋 **Analysis summary:** {result['summary']}")
-
-# Add admin link at bottom of sidebar
-st.sidebar.divider()
-if st.sidebar.button("⚙️ Admin", width='stretch'):
-    st.switch_page("pages/8_Admin.py")

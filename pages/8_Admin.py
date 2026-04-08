@@ -10,6 +10,7 @@ from db.models import (
     AiAuditResult, OfflineAuditResult, MappingReview
 )
 from services.auth import get_current_user, has_permission, load_rbac_config, require_sign_in
+from utils.app_navigation import render_app_sidebar
 from services.feature_flags import load_feature_flags, save_feature_flags
 from services.business_tags import load_business_tags, save_business_tags
 from services.mitre_coverage import get_mitre_engine
@@ -21,6 +22,7 @@ st.set_page_config(page_title="Admin", page_icon="⚙️", layout="wide")
 
 require_sign_in("the Admin page")
 username = get_current_user()
+render_app_sidebar(username)
 
 st.title("⚙️ Administration")
 
@@ -571,6 +573,5 @@ try:
 finally:
     db.close()
 
-# Add admin link at bottom of sidebar (already on admin page, but keep for consistency)
 st.sidebar.divider()
-st.sidebar.caption("⚙️ Administration Page")
+st.sidebar.caption("Administration")

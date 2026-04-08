@@ -9,6 +9,7 @@ from db.models import RuleImplementation, UseCase
 from db.repo import RuleRepository, RuleChangeLogRepository
 from db.session import SessionLocal
 from services.auth import get_current_user, has_permission, require_sign_in
+from utils.app_navigation import render_app_sidebar
 from services.rule_dry_run import dry_run_event
 from services.rule_export_pack import build_rules_export_zip
 from services.rule_playbook import format_playbook_for_diff, normalize_playbook, playbook_from_form
@@ -25,6 +26,7 @@ st.set_page_config(
 
 require_sign_in("Detection engineering")
 username = get_current_user()
+render_app_sidebar(username)
 
 if not has_permission("read"):
     st.error("Read permission required.")

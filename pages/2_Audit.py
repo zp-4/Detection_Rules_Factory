@@ -16,6 +16,7 @@ from db.repo import UseCaseRepository, RuleRepository
 from db.models import RuleImplementation
 from utils.hashing import compute_rule_hash
 from utils.session_persistence import restore_session_state, persist_session_state
+from utils.app_navigation import render_app_sidebar
 from utils.ai_config import (
     get_ai_config,
     get_api_key_for_provider,
@@ -314,6 +315,8 @@ st.markdown("""
 This tool ingests SOC detection rules and performs gap analysis against the MITRE ATT&CK framework.
 It provides **Offline** platform coverage checks and **Online** AI-based logic analysis.
 """)
+
+render_app_sidebar(username)
 
 # Sidebar
 st.sidebar.header("Configuration")
@@ -1675,8 +1678,3 @@ else:
         "template.csv",
         "text/csv"
     )
-
-# Add admin link at bottom of sidebar
-st.sidebar.divider()
-if st.sidebar.button("⚙️ Admin", width='stretch'):
-    st.switch_page("pages/8_Admin.py")

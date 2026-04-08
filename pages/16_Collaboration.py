@@ -4,6 +4,7 @@ import streamlit as st
 from db.repo import NotificationRepository
 from db.session import SessionLocal
 from services.auth import get_current_user, has_permission, require_sign_in
+from utils.app_navigation import render_app_sidebar
 from services.comment_notifications import add_comment_with_notifications
 from utils.session_persistence import restore_session_state
 
@@ -13,6 +14,7 @@ st.set_page_config(page_title="Collaboration", page_icon="💬", layout="wide")
 
 require_sign_in("Collaboration")
 username = get_current_user() or ""
+render_app_sidebar(username)
 
 if not has_permission("read"):
     st.error("Read permission required.")

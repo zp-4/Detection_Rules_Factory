@@ -4,6 +4,7 @@ import streamlit as st
 from db.session import SessionLocal
 from db.repo import UseCaseRepository
 from services.auth import get_current_user, has_permission, require_sign_in
+from utils.app_navigation import render_app_sidebar
 from services.sigma_git_import import import_sigma_from_git
 from utils.session_persistence import restore_session_state
 
@@ -16,6 +17,7 @@ st.set_page_config(
 )
 
 require_sign_in("Git Sigma import")
+render_app_sidebar(get_current_user() or "")
 
 if not has_permission("create"):
     st.error("**create** permission is required to import rules.")
