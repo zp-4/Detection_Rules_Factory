@@ -78,6 +78,9 @@ class RuleImplementation(Base):
     playbook = Column(JSON, nullable=True)
     # CTI traceability: [{ "cti_entry_id": int, "note": str, "linked_at": str }]
     cti_refs = Column(JSON, nullable=True)
+    # Soft-archive deprecated rules (hidden from default catalogue)
+    archived_at = Column(DateTime, nullable=True, index=True)
+    archived_by = Column(String(100), nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

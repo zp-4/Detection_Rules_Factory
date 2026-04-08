@@ -20,6 +20,8 @@ Items identified but **not** implemented unless explicitly requested (see `.curs
 | CTI | Binary PDF storage + VirusTotal-style enrichment | Excerpt + metadata only; local IOC parse only |
 | DB | Postgres migration for `cti_library_entries` / `cti_refs` | SQLite migration script provided |
 | Collaboration | Email / Slack for @mentions | In-app notifications only |
+| Governance | PPTX export, scheduled archival jobs | PDF one-pager + manual archive only |
+| DB | Postgres migration for `archived_at` / `archived_by` | SQLite migration script provided |
 | DB | Postgres migration for `user_notifications` / `comments.mentions` | SQLite migration script provided |
 
 ## How to use this file

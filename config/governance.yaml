@@ -1,0 +1,2 @@
+# Retention: suggest archiving retired rules after N days since last update
+retention_days_after_retired: 90

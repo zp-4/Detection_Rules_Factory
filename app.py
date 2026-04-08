@@ -138,6 +138,11 @@ with r6b:
     if st.button("💬 Collaboration", width="stretch"):
         st.switch_page("pages/16_Collaboration.py")
 
+r7a, r7b = st.columns(2)
+with r7a:
+    if st.button("📦 Governance", width="stretch"):
+        st.switch_page("pages/17_Governance.py")
+
 st.divider()
 
 # Status

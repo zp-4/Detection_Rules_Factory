@@ -42,7 +42,11 @@ try:
         three_months_ago = datetime.now() - timedelta(days=90)
         updated_count = 0
         
-        all_rules_to_check = db_session.query(RuleImplementation).all()
+        all_rules_to_check = (
+            db_session.query(RuleImplementation)
+            .filter(RuleImplementation.archived_at.is_(None))
+            .all()
+        )
         
         for rule in all_rules_to_check:
             needs_tag = False
@@ -112,8 +116,17 @@ try:
                 st.info(f"📅 {updated} rule(s) tagged with 'to_improve' (not audited in 3+ months)")
             st.session_state['stale_rules_checked'] = True
     
-    # Get all rules to extract unique tags
-    all_rules = db.query(RuleImplementation).all()
+    show_archived_cat = st.sidebar.checkbox(
+        "Show archived rules",
+        value=False,
+        key="cat_show_archived",
+        help="Archived rules are hidden by default (Governance).",
+    )
+    _all_q = db.query(RuleImplementation)
+    if not show_archived_cat:
+        _all_q = _all_q.filter(RuleImplementation.archived_at.is_(None))
+    # Get all rules to extract unique tags (respect archived toggle)
+    all_rules = _all_q.all()
     all_tags = set()
     for rule in all_rules:
         # Extract tags from JSON field, handling different formats
@@ -222,7 +235,9 @@ try:
     
     # Get all rules
     rules_query = db.query(RuleImplementation)
-    
+    if not show_archived_cat:
+        rules_query = rules_query.filter(RuleImplementation.archived_at.is_(None))
+
     # Filter by enabled status (only if column exists)
     try:
         if not show_disabled:
@@ -833,6 +848,8 @@ try:
                         # Add disabled indicator to title if disabled
                         if hasattr(rule, 'enabled') and rule.enabled is not None and not rule.enabled:
                             rule_title = f"~~{rule_title}~~ ⚠️ (Disabled)"
+                        if getattr(rule, "archived_at", None):
+                            rule_title = f"{rule_title} 📦 (Archived)"
                         st.markdown(f"### {rule_title}")
                     with col_meta:
                         st.caption(f"📅 {rule.created_at.strftime('%Y-%m-%d')}")

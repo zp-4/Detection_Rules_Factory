@@ -458,6 +458,8 @@ class RuleChangeLogRepository:
             "operational_status": getattr(rule, "operational_status", None) or "production",
             "playbook": getattr(rule, "playbook", None),
             "cti_refs": getattr(rule, "cti_refs", None),
+            "archived_at": rule.archived_at.isoformat() if getattr(rule, "archived_at", None) else None,
+            "archived_by": getattr(rule, "archived_by", None),
             "created_at": rule.created_at.isoformat() if rule.created_at else None,
             "updated_at": rule.updated_at.isoformat() if rule.updated_at else None,
         }
@@ -660,6 +662,8 @@ class RuleChangeLogRepository:
                 operational_status=prev.get("operational_status") or "production",
                 playbook=prev.get("playbook"),
                 cti_refs=prev.get("cti_refs"),
+                archived_at=None,
+                archived_by=None,
                 version=(prev.get("version", 1) or 1) + 1
             )
             db.add(restored_rule)
@@ -719,6 +723,21 @@ class RuleChangeLogRepository:
                 rule.playbook = prev.get("playbook")
             if hasattr(rule, "cti_refs"):
                 rule.cti_refs = prev.get("cti_refs")
+            if hasattr(rule, "archived_at"):
+                ar = prev.get("archived_at")
+                if ar is None:
+                    rule.archived_at = None
+                elif isinstance(ar, str):
+                    try:
+                        rule.archived_at = datetime.fromisoformat(
+                            ar.replace("Z", "+00:00")
+                        )
+                    except Exception:
+                        rule.archived_at = None
+                else:
+                    rule.archived_at = ar
+            if hasattr(rule, "archived_by"):
+                rule.archived_by = prev.get("archived_by")
             rule.version = (rule.version or 1) + 1
             rule.updated_at = datetime.utcnow()
             

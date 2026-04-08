@@ -9,7 +9,9 @@ from db.models import RuleImplementation, UseCase
 from db.repo import UseCaseRepository, RuleRepository
 from services.mitre_coverage import get_mitre_engine
 from services.auth import get_current_user, require_sign_in
-from datetime import datetime, timedelta
+from services.exec_metrics import collect_executive_metrics
+from services.exec_report_pdf import build_executive_pdf
+from datetime import datetime, timedelta, timezone
 import json
 from collections import Counter, defaultdict
 
@@ -57,7 +59,11 @@ db = SessionLocal()
 try:
     # Get all use cases and rules
     use_cases = UseCaseRepository.list_all(db, limit=1000)
-    all_rules = db.query(RuleImplementation).all()
+    all_rules = (
+        db.query(RuleImplementation)
+        .filter(RuleImplementation.archived_at.is_(None))
+        .all()
+    )
     
     # Initialize MITRE engine
     mitre_engine = get_mitre_engine()
@@ -133,6 +139,16 @@ try:
             rules_needing_improvement,
             help="Rules tagged for improvement"
         )
+
+    _em = collect_executive_metrics(db, include_archived=False)
+    _pdf = build_executive_pdf(_em, title="MITRE coverage — executive summary")
+    st.download_button(
+        "📄 Download executive PDF",
+        data=_pdf,
+        file_name=f"executive_summary_{datetime.now(timezone.utc).strftime('%Y%m%d')}.pdf",
+        mime="application/pdf",
+        help="One-page PDF with catalogue metrics (same family as Governance page).",
+    )
     
     st.divider()
     
