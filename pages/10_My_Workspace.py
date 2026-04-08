@@ -14,6 +14,7 @@ from services.user_workspace import (
 )
 from utils.session_persistence import restore_session_state
 from utils.app_navigation import render_app_sidebar
+from utils.mitre_links import rule_mitre_technique_ids, technique_links_markdown
 
 restore_session_state()
 
@@ -99,6 +100,10 @@ try:
     attention = rules_needing_attention(scoped_rules)
 
     st.subheader("Rules in your scope needing attention")
+    st.caption(
+        "Tags **to_improve** / **to_update_mapping** flag follow-up (including stale audits on the catalogue). "
+        "Official technique pages below help validate mappings."
+    )
     if attention:
         st.dataframe(
             pd.DataFrame(
@@ -117,6 +122,22 @@ try:
         )
         if len(attention) > 50:
             st.caption(f"Showing 50 of {len(attention)} rules.")
+        with st.expander("MITRE ATT&CK — official technique pages", expanded=False):
+            st.markdown(
+                "One-click references on [MITRE ATT&CK](https://attack.mitre.org/) for techniques "
+                "declared on these rules (explainability)."
+            )
+            any_links = False
+            for r in attention[:40]:
+                tids = rule_mitre_technique_ids(r)
+                if not tids:
+                    continue
+                any_links = True
+                st.markdown(
+                    f"**{r.rule_name}** (rule `#{r.id}`): {technique_links_markdown(tids)}"
+                )
+            if not any_links:
+                st.caption("No MITRE technique IDs on these rows; open the rule in the catalogue to add mappings.")
     else:
         st.success("No tagged attention items in your scoped rules.")
 
