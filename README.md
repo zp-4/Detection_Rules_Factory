@@ -2,20 +2,6 @@
 
 A comprehensive platform for managing SOC detection rules and MITRE ATT&CK coverage analysis.
 
-## Contribution
-
-Work I added to this codebase:
-
-- **Identity & workspace**: dedicated sign-in flow, user profile, personal workspace, and password-based authentication (PBKDF2) integrated with RBAC in YAML
-- **Platform controls**: feature flags, optional maintenance banner, global AI disable switch, per-team AI run quotas, and an admin UI for governed business tags on the rules catalogue
-- **Lifecycle**: use case workflow with a decision log, review queue (priority, SLA, assignee, due dates), business rule versioning with a visual diff page, external ticket references, operational status on rules, and SQLite migrations for these fields
-- **MITRE & coverage**: coverage hub with YAML-defined scopes and CTI technique bundles, gap lists and CSV export, ATT&CK Navigator layer export, and catalogue filters by MITRE tactic and sub-techniques
-- **Detection engineering**: per-rule playbooks (false positives, validation, escalation, contacts), heuristic dry-run against JSON samples, ZIP export of rules with a manifest, and near-duplicate detection via text similarity
-- **CTI**: library of reusable sources (metadata and excerpts), traceability links from rules to library entries, and local IOC parsing (no external enrichment APIs)
-- **Collaboration**: comments on rules and use cases, `@username` mentions resolved against RBAC users, and an in-app notification inbox
-- **Governance**: soft archival of rules (`archived_at` / `archived_by`), configurable retention hint for retired rules, catalogue and dashboard views that exclude archived content by default, and one-page executive summary PDFs (including a download action on the MITRE dashboard)
-- **Tests**: unit tests for the new services and helpers shipped with these features
-
 ## 🎯 Features
 
 - **📋 Detection Rules Catalogue**: Manage and organize detection rules with advanced filtering (tags, platforms, MITRE techniques, formats)
@@ -31,6 +17,20 @@ Work I added to this codebase:
 - **🔒 Enhanced RBAC**: Strict permission enforcement across all pages
 - **🔍 CTI Detection**: AI-powered detection rule extraction from threat intelligence (text, PDF, Excel, URL)
 - **👥 Group Coverage**: Analyze MITRE ATT&CK coverage by threat actor groups
+
+## Contribution
+
+Work I added to this codebase:
+
+- **Identity & workspace**: dedicated sign-in flow, user profile, personal workspace, and password-based authentication (PBKDF2) integrated with RBAC in YAML
+- **Platform controls**: feature flags, optional maintenance banner, global AI disable switch, per-team AI run quotas, and an admin UI for governed business tags on the rules catalogue
+- **Lifecycle**: use case workflow with a decision log, review queue (priority, SLA, assignee, due dates), business rule versioning with a visual diff page, external ticket references, operational status on rules, and SQLite migrations for these fields
+- **MITRE & coverage**: coverage hub with YAML-defined scopes and CTI technique bundles, gap lists and CSV export, ATT&CK Navigator layer export, and catalogue filters by MITRE tactic and sub-techniques
+- **Detection engineering**: per-rule playbooks (false positives, validation, escalation, contacts), heuristic dry-run against JSON samples, ZIP export of rules with a manifest, and near-duplicate detection via text similarity
+- **CTI**: library of reusable sources (metadata and excerpts), traceability links from rules to library entries, and local IOC parsing (no external enrichment APIs)
+- **Collaboration**: comments on rules and use cases, `@username` mentions resolved against RBAC users, and an in-app notification inbox
+- **Governance**: soft archival of rules (`archived_at` / `archived_by`), configurable retention hint for retired rules, catalogue and dashboard views that exclude archived content by default, and one-page executive summary PDFs (including a download action on the MITRE dashboard)
+- **Tests**: unit tests for the new services and helpers shipped with these features
 
 ## 🏗️ Architecture
 
