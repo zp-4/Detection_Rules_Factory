@@ -146,6 +146,11 @@ with r7b:
     if st.button("📥 Git Sigma import", width="stretch"):
         st.switch_page("pages/18_Git_Sigma_Import.py")
 
+r8a, = st.columns(1)
+with r8a:
+    if st.button("✍️ Rule draft assistant", width="stretch"):
+        st.switch_page("pages/19_Rule_Draft_Assistant.py")
+
 st.divider()
 
 # Status

@@ -21,6 +21,7 @@ A **Streamlit** application for managing SOC detection rules, analysing **MITRE 
 - **🔒 RBAC** — Roles (`reader` → `admin`) enforced across pages; optional password hashing (PBKDF2).
 - **🤖 AI** — Audits, mapping, CTI extraction; quotas per team; session-friendly locking and duplicate reuse.
 - **🔌 Integrations** — Optional outbound **webhooks** (use case approved, mapping changed, offline audit completed) via `config/webhooks.yaml`; optional **read-only REST API** (`rest_api.py`) with bearer tokens in `config/rest_api.yaml`; **Sigma import from Git** (shallow clone + YAML scan, page **Git Sigma import**).
+- **✍️ AI rule draft** — Natural-language → rule skeleton + suggested MITRE IDs + false-positive checklist (`pages/19_Rule_Draft_Assistant.py`, team AI quota).
 
 For **step-by-step workflows**, RBAC tables, configuration, and data model details, see **[USAGE.md](USAGE.md)**.
 
@@ -52,6 +53,7 @@ Work [zp-4](https://github.com/zp-4) added to this repository:
 - **Governance** — Soft archive, retention hints, executive PDF on the dashboard path.
 - **Tests** — Unit tests for the services above.
 - **Integrations** — Webhooks service + optional FastAPI REST (`uvicorn rest_api:app`) + Sigma rules import from a shallow Git clone (`services/sigma_git_import.py`, `pages/18_Git_Sigma_Import.py`).
+- **AI product** — Rule drafting assistant (natural language → skeleton + MITRE hints + FP checklist): `services/rule_draft_assistant.py`, `pages/19_Rule_Draft_Assistant.py`, `AIEngine.draft_rule_from_natural_language`.
 
 ---
 

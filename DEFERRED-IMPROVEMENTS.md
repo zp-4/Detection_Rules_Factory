@@ -27,6 +27,8 @@ Items identified but **not** implemented unless explicitly requested (see `.curs
 | Integrations | Webhook retries, signing (HMAC), delivery log | Fire-and-forget POST only |
 | Integrations | REST API writes (create/update rules) | Read-only MVP |
 | Integrations | Private Git / SSH remotes, scheduled sync, update-on-pull | MVP: public HTTPS + shallow clone only |
+| IA produit | Validate LLM MITRE IDs against local MITRE engine | Suggestions are advisory only |
+| IA produit | “Add to catalogue” one-click from draft assistant | Copy/paste or manual create today |
 
 ## How to use this file
 

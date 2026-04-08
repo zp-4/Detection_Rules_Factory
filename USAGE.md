@@ -494,6 +494,10 @@ Use **Git Sigma import** (`pages/18_Git_Sigma_Import.py`). Requires **`create`**
 
 Private repositories or SSH remotes are not covered in this MVP—clone externally and use a local path import only if you extend the service.
 
+### Rule draft assistant (AI)
+
+Page **Rule draft assistant** (`pages/19_Rule_Draft_Assistant.py`): requires **`trigger_ai`** (e.g. reviewer/admin). Enter a plain-language detection goal; the model returns a **rule skeleton** (Sigma/Splunk/KQL per selection), **suggested MITRE technique IDs**, a short **rationale**, and a **false-positive checklist**. Consumes **one monthly AI run** from your team quota on success. Configure API keys via **`0_AI_Config`** or another AI page’s sidebar.
+
 ---
 
 ## Administration
