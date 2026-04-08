@@ -11,6 +11,7 @@ if sys.platform == "win32":
 
 import streamlit as st
 from utils.session_persistence import restore_session_state
+from utils.streamlit_ui import apply_global_styles
 from services.auth import (
     get_current_user,
     login,
@@ -25,8 +26,10 @@ st.set_page_config(
     page_title="Sign in — Detection Rules Factory",
     page_icon="🔐",
     layout="centered",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
+
+apply_global_styles()
 
 username = get_current_user()
 
@@ -46,33 +49,39 @@ if username:
             st.rerun()
     st.stop()
 
-st.markdown("# Detection Rules Factory")
-st.markdown("**Sign in** to manage detection rules and MITRE ATT&CK coverage.")
+_, mid, _ = st.columns([1, 1.15, 1])
+with mid:
+    with st.container(border=True):
+        st.markdown("## Detection Rules Factory")
+        st.caption("Sign in to manage detection rules and MITRE ATT&CK coverage.")
 
-with st.form("sign_in_portal"):
-    login_username = st.text_input("Username", placeholder="e.g. admin")
-    login_password = st.text_input("Password", type="password", placeholder="If required for your account")
-    submitted = st.form_submit_button("Sign in", type="primary")
-    if submitted:
-        u = login_username.strip() if login_username else ""
-        if not u:
-            st.error("Please enter a username.")
-        elif user_has_password(u) and not (login_password and login_password.strip()):
-            st.error("Password required for this account.")
-        elif login(u, login_password or ""):
-            st.switch_page("app.py")
-        else:
-            st.error("Invalid username or password.")
+        with st.form("sign_in_portal"):
+            login_username = st.text_input("Username", placeholder="e.g. admin")
+            login_password = st.text_input(
+                "Password",
+                type="password",
+                placeholder="If required for your account",
+            )
+            submitted = st.form_submit_button("Sign in", type="primary", use_container_width=True)
+            if submitted:
+                u = login_username.strip() if login_username else ""
+                if not u:
+                    st.error("Please enter a username.")
+                elif user_has_password(u) and not (login_password and login_password.strip()):
+                    st.error("Password required for this account.")
+                elif login(u, login_password or ""):
+                    st.switch_page("app.py")
+                else:
+                    st.error("Invalid username or password.")
 
 cfg = load_rbac_config()
 known = sorted(cfg.get("users", {}).keys())
 if known:
-    with st.expander("Configured accounts (demo)"):
+    with st.expander("Demo accounts"):
         st.markdown("You can sign in as: " + ", ".join(f"`{u}`" for u in known))
 
-st.divider()
 st.caption(
     "Accounts without `password_hash` in RBAC: username only. "
-    "With `password_hash`, use `python scripts/hash_password.py` to set secrets. "
-    "For production, prefer SSO / enterprise identity."
+    "Use `python scripts/hash_password.py` to set passwords. "
+    "Prefer SSO for production."
 )

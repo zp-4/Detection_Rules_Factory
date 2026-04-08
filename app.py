@@ -42,40 +42,54 @@ render_app_sidebar(username, _n_unread)
 _banner = maintenance_message()
 if _banner:
     st.warning(_banner)
-st.title("Detection Rules Factory")
+
 st.markdown(
-    "Manage detection rules, MITRE ATT&CK coverage, CTI workflows, and governance — "
-    "use the **sidebar** or the quick links below."
+    """
+<div class="drf-hero">
+  <p class="drf-hero-kicker">SOC detection platform</p>
+  <h1 class="drf-hero-title">Detection Rules Factory</h1>
+  <p class="drf-hero-lead">
+    Unified rule catalogue, MITRE ATT&amp;CK coverage, CTI workflows, and governance —
+    use the sidebar or the shortcuts below.
+  </p>
+</div>
+    """,
+    unsafe_allow_html=True,
 )
 
 render_home_quick_links(_n_unread)
 
 st.divider()
+st.markdown("### System status")
 
-# Status
-st.subheader("System status")
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    try:
-        from db.session import engine
-        from sqlalchemy import inspect
-        inspector = inspect(engine)
-        tables = inspector.get_table_names()
-        st.success(f"Database: {len(tables)} tables")
-    except Exception:
-        st.error("Database: not initialized")
+    with st.container(border=True):
+        st.caption("DATABASE")
+        try:
+            from db.session import engine
+            from sqlalchemy import inspect
+            inspector = inspect(engine)
+            tables = inspector.get_table_names()
+            st.success(f"{len(tables)} tables")
+        except Exception:
+            st.error("Not initialized")
 
 with col2:
-    try:
-        from services.mitre_coverage import get_mitre_engine
-        get_mitre_engine()
-        st.success("MITRE engine: ready")
-    except Exception:
-        st.warning("MITRE engine: not loaded")
+    with st.container(border=True):
+        st.caption("MITRE ENGINE")
+        try:
+            from services.mitre_coverage import get_mitre_engine
+            get_mitre_engine()
+            st.success("Ready")
+        except Exception:
+            st.warning("Not loaded")
 
 with col3:
-    if username:
-        st.success(f"User: {username}")
-    else:
-        st.info("User: not logged in")
+    with st.container(border=True):
+        st.caption("SESSION")
+        if username:
+            st.success(username)
+        else:
+            st.info("Not signed in")

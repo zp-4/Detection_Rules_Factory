@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import streamlit as st
 
+from utils.streamlit_ui import apply_global_styles
+
 # (label, page path, stable key suffix for st.button)
 _NAV_GROUPS: list[tuple[str, list[tuple[str, str, str]]]] = [
     (
@@ -106,6 +108,7 @@ def render_app_sidebar(username: str, unread_notifications: int | None = None) -
     Full sidebar: maintenance, identity, sign out, then grouped navigation.
     Call once per page after the user is authenticated.
     """
+    apply_global_styles()
     from services.auth import logout
     from services.feature_flags import maintenance_message
 
@@ -128,16 +131,18 @@ def render_app_sidebar(username: str, unread_notifications: int | None = None) -
 
 def render_home_quick_links(unread_notifications: int = 0) -> None:
     """Home page: expanders instead of a wall of buttons."""
-    st.subheader("Quick access")
-    for idx, (title, items) in enumerate(_NAV_GROUPS):
-        expanded = idx == 0
-        with st.expander(title, expanded=expanded):
-            n = len(items)
-            ncols = min(4, max(1, n))
-            cols = st.columns(ncols)
-            for i, (label, path, suffix) in enumerate(items):
-                display = _collab_label(unread_notifications) if suffix == "collab" else label
-                key = f"home_{suffix}"
-                with cols[i % ncols]:
-                    if st.button(display, key=key, use_container_width=True):
-                        st.switch_page(path)
+    with st.container(border=True):
+        st.markdown("### Quick access")
+        st.caption("Grouped shortcuts — same destinations as the sidebar.")
+        for idx, (title, items) in enumerate(_NAV_GROUPS):
+            expanded = idx == 0
+            with st.expander(title, expanded=expanded):
+                n = len(items)
+                ncols = min(4, max(1, n))
+                cols = st.columns(ncols)
+                for i, (label, path, suffix) in enumerate(items):
+                    display = _collab_label(unread_notifications) if suffix == "collab" else label
+                    key = f"home_{suffix}"
+                    with cols[i % ncols]:
+                        if st.button(display, key=key, use_container_width=True):
+                            st.switch_page(path)

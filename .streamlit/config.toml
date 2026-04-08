@@ -6,10 +6,11 @@ showSidebarNavigation = false
 toolbarMode = "viewer"
 
 [theme]
-primaryColor = "#1f77b4"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f0f2f6"
-textColor = "#262730"
+# Aligned with utils/streamlit_ui.py (teal / slate)
+primaryColor = "#0d9488"
+backgroundColor = "#f8fafc"
+secondaryBackgroundColor = "#f1f5f9"
+textColor = "#0f172a"
 font = "sans serif"
 
 [server]
