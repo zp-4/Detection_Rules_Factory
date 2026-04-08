@@ -1,6 +1,9 @@
 [client]
 # Hide the auto-generated multipage list; navigation is provided in-app (see utils/app_navigation.py).
 showSidebarNavigation = false
+# Top-right ⋮ menu: not app settings — Streamlit runtime (rerun, clear cache, etc.). "viewer" hides
+# developer-only items for a cleaner UI. Use "auto" or "developer" locally if you want them back.
+toolbarMode = "viewer"
 
 [theme]
 primaryColor = "#1f77b4"
