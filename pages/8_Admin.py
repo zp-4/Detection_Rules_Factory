@@ -1,4 +1,5 @@
 """Admin page."""
+import json
 import streamlit as st
 from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
@@ -13,7 +14,7 @@ from services.feature_flags import load_feature_flags, save_feature_flags
 from services.business_tags import load_business_tags, save_business_tags
 from services.mitre_coverage import get_mitre_engine
 from services.quota import set_quota_limit
-from db.repo import QuotaRepository
+from db.repo import QuotaRepository, ConfigAuditRepository
 from utils.time import get_current_period
 
 st.set_page_config(page_title="Admin", page_icon="⚙️", layout="wide")
@@ -29,12 +30,13 @@ if not has_permission("admin"):
 
 db = SessionLocal()
 try:
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
         [
             "📊 System Statistics",
             "📈 Rule Quality Metrics",
             "🔒 RBAC",
             "🎛️ Platform",
+            "📜 Config audit",
             "📝 README Editor",
             "🏷️ Business tags",
         ]
@@ -311,6 +313,20 @@ try:
         st.caption("Operational switches and per-team AI run quotas for the current month.")
 
         flags = load_feature_flags()
+        team_options = sorted(
+            {
+                (u.get("team") or "").strip()
+                for u in load_rbac_config().get("users", {}).values()
+                if isinstance(u, dict) and (u.get("team") or "").strip()
+            }
+        )
+        if not team_options:
+            team_options = ["security", "soc"]
+        disabled_for = flags.get("disable_ai_teams") or []
+        if not isinstance(disabled_for, list):
+            disabled_for = []
+        default_team_disable = [t for t in disabled_for if t in team_options]
+
         with st.form("feature_flags_form"):
             maint = st.text_area(
                 "Maintenance banner (empty = off)",
@@ -322,12 +338,30 @@ try:
                 value=bool(flags.get("disable_ai_globally")),
                 help="New AIEngine instances will raise; turn off for maintenance or policy.",
             )
+            ai_teams_pick = st.multiselect(
+                "Disable AI for these teams (selective)",
+                options=team_options,
+                default=default_team_disable,
+                help="Blocks AI for users in these teams (by session team). Ignored when global disable is on.",
+            )
             if st.form_submit_button("Save platform settings", type="primary"):
                 save_feature_flags(
                     {
                         "maintenance_message": maint.strip(),
                         "disable_ai_globally": disable_ai,
+                        "disable_ai_teams": ai_teams_pick,
                     }
+                )
+                ConfigAuditRepository.append(
+                    db,
+                    username,
+                    "platform",
+                    "save_feature_flags",
+                    {
+                        "maintenance_message": maint.strip(),
+                        "disable_ai_globally": disable_ai,
+                        "disable_ai_teams": list(ai_teams_pick),
+                    },
                 )
                 st.success("Platform settings saved to `config/feature_flags.yaml`.")
                 st.rerun()
@@ -362,11 +396,49 @@ try:
                 )
             with c3:
                 if st.button("Apply", key=f"quota_apply_{team}"):
-                    set_quota_limit(db, team, int(new_lim))
+                    old_lim = int(q.runs_limit)
+                    new_val = int(new_lim)
+                    set_quota_limit(db, team, new_val)
+                    ConfigAuditRepository.append(
+                        db,
+                        username,
+                        "quota",
+                        "set_limit",
+                        {
+                            "period": period,
+                            "team": team,
+                            "previous_limit": old_lim,
+                            "new_limit": new_val,
+                        },
+                    )
                     st.success(f"Updated limit for {team}")
                     st.rerun()
 
     with tab5:
+        st.subheader("📜 Configuration audit log")
+        st.caption(
+            "Platform flags, quotas, business tags, and README saves from this UI. "
+            "Direct edits to `config/rbac.yaml` are not recorded here."
+        )
+        rows = ConfigAuditRepository.list_recent(db, limit=300)
+        if not rows:
+            st.info("No entries yet.")
+        else:
+            import pandas as pd
+
+            data = [
+                {
+                    "Time (UTC)": r.occurred_at,
+                    "Actor": r.actor_username,
+                    "Category": r.category,
+                    "Action": r.action,
+                    "Detail": json.dumps(r.detail or {}, ensure_ascii=False)[:2000],
+                }
+                for r in rows
+            ]
+            st.dataframe(pd.DataFrame(data), width='stretch', hide_index=True)
+
+    with tab6:
         st.subheader("📝 README Editor")
         st.info("Edit the README.md file directly from this interface. Changes are saved immediately.")
         
@@ -405,12 +477,21 @@ try:
                 try:
                     with open(readme_path, 'w', encoding='utf-8') as f:
                         f.write(edited_content)
-                    
+                    ConfigAuditRepository.append(
+                        db,
+                        username,
+                        "readme",
+                        "save",
+                        {
+                            "path": readme_path,
+                            "bytes": len(edited_content.encode("utf-8")),
+                        },
+                    )
                     st.session_state["readme_content"] = edited_content
                     st.success(f"✅ README.md saved successfully!")
-                    
-                    # Log the change
-                    st.info(f"📝 File updated by {username} at {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}")
+                    st.info(
+                        f"📝 File updated by {username} at {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}"
+                    )
                 except Exception as e:
                     st.error(f"❌ Error saving README.md: {e}")
         
@@ -456,7 +537,7 @@ try:
         with st.expander("📄 Preview README (Markdown)", expanded=False):
             st.markdown(edited_content)
 
-    with tab6:
+    with tab7:
         st.subheader("🏷️ Business tags (catalogue taxonomy)")
         st.caption("Governed tag list and optional enforcement on the Rules catalogue.")
         bt = load_business_tags()
@@ -474,6 +555,16 @@ try:
                 lines = [ln.strip() for ln in raw_tags.splitlines() if ln.strip()]
                 save_business_tags(
                     {"allowed_tags": lines, "enforce_catalogue_tags": enforce}
+                )
+                ConfigAuditRepository.append(
+                    db,
+                    username,
+                    "business_tags",
+                    "save",
+                    {
+                        "allowed_tags_count": len(lines),
+                        "enforce_catalogue_tags": enforce,
+                    },
                 )
                 st.success("Saved to `config/business_tags.yaml`.")
                 st.rerun()

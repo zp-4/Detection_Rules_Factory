@@ -23,6 +23,7 @@ Items identified but **not** implemented unless explicitly requested (see `.curs
 | Governance | PPTX export, scheduled archival jobs | PDF one-pager + manual archive only |
 | DB | Postgres migration for `archived_at` / `archived_by` | SQLite migration script provided |
 | DB | Postgres migration for `user_notifications` / `comments.mentions` | SQLite migration script provided |
+| DB | Postgres migration for `config_audit_logs` | SQLite migration script provided |
 
 ## How to use this file
 

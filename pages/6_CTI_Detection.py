@@ -319,19 +319,22 @@ with tab1:
                             api_key=llama_api_key or "",
                             provider="llama",
                             base_url=llama_base_url,
-                            model_name=llama_model_name or "llama3"
+                            model_name=llama_model_name or "llama3",
+                            team=st.session_state.get("user_team"),
                         )
                     elif ai_provider == "OpenAI":
                         ai_engine = AIEngine(
                             openai_api_key,
                             provider="openai",
                             model_name=openai_model_name,
+                            team=st.session_state.get("user_team"),
                         )
                     else:
                         ai_engine = AIEngine(
                             gemini_api_key,
                             provider="gemini",
                             model_name=gemini_model_name,
+                            team=st.session_state.get("user_team"),
                         )
                     
                     # Limit content size to avoid token limits (keep last 10000 chars for context)

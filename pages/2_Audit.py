@@ -1010,6 +1010,7 @@ if all_rules_list:
                     openai_api_key,
                     provider="openai",
                     model_name=openai_model_name,
+                    team=st.session_state.get("user_team"),
                 )
             elif ai_provider == "Gemini":
                 if not gemini_api_key:
@@ -1019,6 +1020,7 @@ if all_rules_list:
                     gemini_api_key,
                     provider="gemini",
                     model_name=gemini_model_name,
+                    team=st.session_state.get("user_team"),
                 )
             elif ai_provider == "Llama (Custom LLM)":
                 if not llama_base_url:
@@ -1028,7 +1030,8 @@ if all_rules_list:
                     api_key=llama_api_key or "",
                     provider="llama",
                     base_url=llama_base_url,
-                    model_name=llama_model_name or "llama3"
+                    model_name=llama_model_name or "llama3",
+                    team=st.session_state.get("user_team"),
                 )
             else:
                 st.error("Please select an AI provider in the sidebar.")

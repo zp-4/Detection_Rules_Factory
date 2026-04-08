@@ -8,7 +8,7 @@ from db.models import (
     UseCase, RuleImplementation, OfflineAuditResult,
     AiAuditResult, CoverageSnapshot, DecisionLog,
     Comment, QuotaUsage, AiLock, RuleChangeLog, CtiLibraryEntry,
-    UserNotification,
+    UserNotification, ConfigAuditLog,
 )
 
 
@@ -762,4 +762,39 @@ class RuleChangeLogRepository:
             return rule
         
         return None
+
+
+# ========== Config audit (admin platform / quota / YAML saves) ==========
+
+
+class ConfigAuditRepository:
+    """Append-only audit trail for configuration changes."""
+
+    @staticmethod
+    def append(
+        db: Session,
+        actor_username: str,
+        category: str,
+        action: str,
+        detail: Optional[Dict[str, Any]] = None,
+    ) -> ConfigAuditLog:
+        row = ConfigAuditLog(
+            actor_username=actor_username,
+            category=category,
+            action=action,
+            detail=detail or {},
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return row
+
+    @staticmethod
+    def list_recent(db: Session, limit: int = 200) -> List[ConfigAuditLog]:
+        return (
+            db.query(ConfigAuditLog)
+            .order_by(desc(ConfigAuditLog.occurred_at))
+            .limit(limit)
+            .all()
+        )
 

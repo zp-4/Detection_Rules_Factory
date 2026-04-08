@@ -3,11 +3,11 @@ import json
 from typing import Dict, Any, Optional, List
 
 
-def _ensure_ai_not_disabled() -> None:
+def _ensure_ai_not_disabled(team: Optional[str] = None) -> None:
     try:
-        from services.feature_flags import ai_globally_disabled
+        from services.feature_flags import ai_disabled_for_team
 
-        if ai_globally_disabled():
+        if ai_disabled_for_team(team):
             raise RuntimeError(
                 "AI features are disabled by an administrator (config/feature_flags.yaml)."
             )
@@ -16,7 +16,15 @@ def _ensure_ai_not_disabled() -> None:
 
 
 class AIEngine:
-    def __init__(self, api_key: str, provider: str = "openai", base_url: Optional[str] = None, model_name: Optional[str] = None):
+    def __init__(
+        self,
+        api_key: str,
+        provider: str = "openai",
+        base_url: Optional[str] = None,
+        model_name: Optional[str] = None,
+        *,
+        team: Optional[str] = None,
+    ):
         """
         Initialize AI Engine with OpenAI, Gemini, or custom LLM (Llama, etc.).
         
@@ -31,7 +39,7 @@ class AIEngine:
                         - LM Studio: "http://localhost:1234/v1"
             model_name: Custom model name (optional, defaults based on provider)
         """
-        _ensure_ai_not_disabled()
+        _ensure_ai_not_disabled(team)
         self.provider = provider.lower()
         self.model_name = model_name
         self.base_url = base_url

@@ -358,3 +358,21 @@ class RuleChangeLog(Base):
         Index('idx_changelog_action', 'action'),
         Index('idx_changelog_changed_by', 'changed_by'),
     )
+
+
+class ConfigAuditLog(Base):
+    """Append-only log of admin configuration changes (platform flags, quotas, etc.)."""
+
+    __tablename__ = "config_audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    occurred_at = Column(DateTime, default=datetime.utcnow, index=True)
+    actor_username = Column(String(100), nullable=False, index=True)
+    category = Column(String(64), nullable=False, index=True)
+    action = Column(String(128), nullable=False)
+    detail = Column(JSON, nullable=True)
+
+    __table_args__ = (
+        Index("idx_cfg_audit_occurred", "occurred_at"),
+        Index("idx_cfg_audit_category", "category"),
+    )
