@@ -8,6 +8,7 @@ from db.repo import UseCaseRepository, CommentRepository
 from services.comment_notifications import add_comment_with_notifications
 from services.auth import get_current_user, has_permission, require_sign_in
 from services.review_schedule import review_due_at_from_start
+from services.webhooks import emit_use_case_approved
 from utils.session_persistence import restore_session_state
 
 restore_session_state()
@@ -121,6 +122,13 @@ try:
                     extra["review_due_at"] = None
 
                 UseCaseRepository.update(db, uc.id, status=new_status, **extra)
+                if new_status == "approved":
+                    emit_use_case_approved(
+                        uc.id,
+                        uc.name,
+                        get_current_user() or "unknown",
+                        old or "",
+                    )
                 st.success(f"Updated **{uc.name}** from `{old}` → `{new_status}`.")
                 st.rerun()
 

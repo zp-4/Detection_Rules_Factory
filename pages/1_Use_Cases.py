@@ -13,6 +13,7 @@ from services.rule_playbook import normalize_playbook, playbook_from_form
 from services.cti_refs import build_cti_refs_from_entry_ids, normalize_cti_refs
 from services.business_tags import load_business_tags, validate_rule_tags
 from services.comment_notifications import add_comment_with_notifications
+from services.webhooks import emit_mapping_changed
 from utils.hashing import compute_rule_hash
 from utils.session_persistence import restore_session_state, persist_session_state
 
@@ -1093,8 +1094,10 @@ try:
                                             )
                                             db.add(review)
                                             db.commit()
+                                            db.refresh(review)
                                             db.refresh(rule)  # Refresh rule from database
-                                            
+                                            emit_mapping_changed(review, rule)
+
                                             # Log to audit trail
                                             RuleChangeLogRepository.log_update(
                                                 db, rule, previous_state, current_user,
@@ -1167,8 +1170,10 @@ try:
                                             )
                                             db.add(review)
                                             db.commit()
+                                            db.refresh(review)
                                             db.refresh(rule)  # Refresh rule from database
-                                            
+                                            emit_mapping_changed(review, rule)
+
                                             # Log to audit trail
                                             RuleChangeLogRepository.log_update(
                                                 db, rule, previous_state, current_user,

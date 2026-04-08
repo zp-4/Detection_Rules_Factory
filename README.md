@@ -20,6 +20,7 @@ A **Streamlit** application for managing SOC detection rules, analysing **MITRE 
 - **⚙️ Administration** — Statistics, quality metrics, RBAC view, platform flags, quotas, config audit log, business tags.
 - **🔒 RBAC** — Roles (`reader` → `admin`) enforced across pages; optional password hashing (PBKDF2).
 - **🤖 AI** — Audits, mapping, CTI extraction; quotas per team; session-friendly locking and duplicate reuse.
+- **🔌 Integrations** — Optional outbound **webhooks** (use case approved, mapping changed, offline audit completed) via `config/webhooks.yaml`; optional **read-only REST API** (`rest_api.py`) with bearer tokens in `config/rest_api.yaml`.
 
 For **step-by-step workflows**, RBAC tables, configuration, and data model details, see **[USAGE.md](USAGE.md)**.
 
@@ -50,15 +51,17 @@ Work [zp-4](https://github.com/zp-4) added to this repository:
 - **Collaboration** — Comments, `@mentions`, notifications inbox.
 - **Governance** — Soft archive, retention hints, executive PDF on the dashboard path.
 - **Tests** — Unit tests for the services above.
+- **Integrations** — Webhooks service + optional FastAPI REST process (`uvicorn rest_api:app`).
 
 ---
 
 ## Architecture
 
 - **UI:** Streamlit multi-page app (`app.py` + `pages/`).
-- **Logic:** `services/` (audit, MITRE, auth, quotas, …).
+- **Logic:** `services/` (audit, MITRE, auth, quotas, webhooks, …).
 - **Persistence:** `db/` (SQLAlchemy models, repositories); default SQLite file `usecase_factory.db`.
 - **Engines:** `src/` (AI client abstraction, MITRE engine, ingestion).
+- **Optional API:** `rest_api.py` (FastAPI) — separate process from Streamlit; same SQLite DB.
 
 Simplified layout:
 
@@ -73,8 +76,9 @@ Detection_Rules_Factory/
 ├── tests/
 ├── init_db.py
 ├── requirements.txt
+├── rest_api.py         # Optional FastAPI (uvicorn)
 ├── README.md
-└── USAGE.md            # User guide (workflows, RBAC, config)
+└── USAGE.md            # User guide (workflows, RBAC, config, integrations)
 ```
 
 ---
@@ -102,7 +106,7 @@ Optional: configure an AI provider in the app sidebar (OpenAI, Gemini, or a loca
 
 | Document | Content |
 |----------|---------|
-| **[USAGE.md](USAGE.md)** | Per-feature usage, RBAC matrix, AI behaviour, DB/config, data model, migrations, admin capabilities |
+| **[USAGE.md](USAGE.md)** | Per-feature usage, RBAC matrix, AI behaviour, DB/config, data model, migrations, admin capabilities, **webhooks & REST** |
 | [LICENSE](LICENSE) | Apache 2.0 |
 | [NOTICE](NOTICE) | Attribution |
 

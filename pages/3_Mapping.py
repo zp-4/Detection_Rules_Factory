@@ -10,6 +10,7 @@ from src.mitre_engine import MitreEngine
 from sqlalchemy.orm.attributes import flag_modified
 from services.auth import get_current_user, has_permission, require_sign_in
 from db.repo import RuleChangeLogRepository
+from services.webhooks import emit_mapping_changed
 
 st.set_page_config(
     page_title="MITRE Mapping Analysis",
@@ -511,7 +512,9 @@ try:
                                         )
                                         db.add(review)
                                         db.commit()
-                                        
+                                        db.refresh(review)
+                                        emit_mapping_changed(review, rule)
+
                                         # Log to audit trail
                                         RuleChangeLogRepository.log_update(
                                             db, rule, previous_state, current_user,
@@ -571,7 +574,9 @@ try:
                                         )
                                         db.add(review)
                                         db.commit()
-                                        
+                                        db.refresh(review)
+                                        emit_mapping_changed(review, rule)
+
                                         # Log to audit trail
                                         RuleChangeLogRepository.log_update(
                                             db, rule, previous_state, current_user,
@@ -626,7 +631,9 @@ try:
                                         )
                                         db.add(review)
                                         db.commit()
-                                        
+                                        db.refresh(review)
+                                        emit_mapping_changed(review, rule)
+
                                         # Log to audit trail
                                         RuleChangeLogRepository.log_update(
                                             db, rule, previous_state, current_user,

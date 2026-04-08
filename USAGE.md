@@ -16,7 +16,8 @@ This document is the **operator and user manual**: workflows per screen, RBAC, c
 8. [Configuration](#configuration)
 9. [Data model](#data-model)
 10. [Development](#development)
-11. [Administration](#administration)
+11. [Integrations](#integrations)
+12. [Administration](#administration)
 
 ---
 
@@ -434,6 +435,54 @@ python db/migrate_add_changelog.py
 3. In production (PostgreSQL), use Alembic or an equivalent migration tool.
 
 New databases can use `python init_db.py` to create the current schema. Older databases may need several migration scripts depending on age.
+
+---
+
+## Integrations
+
+### Outbound webhooks
+
+Configure `config/webhooks.yaml`. Set `enabled: true` and add one or more `endpoints` with an HTTPS `url` and an `events` list.
+
+Emitted events:
+
+| Event | When |
+|-------|------|
+| `use_case_approved` | A use case transitions to status `approved` (Use case workflow page). |
+| `mapping_changed` | A `MappingReview` row is created from the catalogue or Mapping page. |
+| `audit_completed` | An offline MITRE audit row is stored (`kind: offline` in payload). |
+
+Each POST body is JSON:
+
+```json
+{
+  "event": "mapping_changed",
+  "occurred_at": "2026-04-08T12:00:00+00:00",
+  "data": { "rule_id": 1, "rule_name": "...", "review_id": 42, ... }
+}
+```
+
+Compatible with **Slack incoming webhooks** and any HTTPS endpoint that accepts `application/json`. Failures are logged only; the Streamlit UI is not blocked.
+
+### Read-only REST API (optional)
+
+1. Edit `config/rest_api.yaml`: set `enabled: true` and add at least one `tokens` entry (`name` + long random `token`).
+2. Run a separate process (same working directory and `DATABASE_URL` as Streamlit):
+
+```bash
+uvicorn rest_api:app --host 127.0.0.1 --port 8080
+```
+
+3. Call with header `Authorization: Bearer <token>`:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Liveness (no auth). |
+| GET | `/api/v1/rules` | Recent rules (query `limit`, max 500). |
+| GET | `/api/v1/rules/{id}` | One rule. |
+| GET | `/api/v1/use-cases` | Recent use cases. |
+
+The API is **read-only** in this version—use Streamlit or future tooling for writes.
 
 ---
 

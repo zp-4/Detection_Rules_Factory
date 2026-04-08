@@ -24,6 +24,9 @@ Items identified but **not** implemented unless explicitly requested (see `.curs
 | DB | Postgres migration for `archived_at` / `archived_by` | SQLite migration script provided |
 | DB | Postgres migration for `user_notifications` / `comments.mentions` | SQLite migration script provided |
 | DB | Postgres migration for `config_audit_logs` | SQLite migration script provided |
+| Integrations | Webhook retries, signing (HMAC), delivery log | Fire-and-forget POST only |
+| Integrations | REST API writes (create/update rules) | Read-only MVP |
+| Integrations | Import/sync rules from Git (Sigma repos) | See roadmap #30 |
 
 ## How to use this file
 
