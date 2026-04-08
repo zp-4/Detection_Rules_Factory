@@ -222,13 +222,31 @@ class Comment(Base):
     author = Column(String(100), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     body = Column(Text, nullable=False)
-    
+    mentions = Column(JSON, nullable=True)  # list of usernames from @mentions
+
     # Relationships
     use_case = relationship("UseCase", back_populates="comments")
     
     __table_args__ = (
         Index('idx_comment_entity', 'entity_type', 'entity_id'),
     )
+
+
+class UserNotification(Base):
+    """In-app notifications (e.g. @mentions on comments)."""
+
+    __tablename__ = "user_notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(100), nullable=False, index=True)
+    message = Column(Text, nullable=False)
+    read_at = Column(DateTime, nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    entity_type = Column(String(50), nullable=True)
+    entity_id = Column(Integer, nullable=True)
+    comment_id = Column(Integer, nullable=True)
+
+    __table_args__ = (Index("idx_notif_user_unread", "username", "read_at"),)
 
 
 class QuotaUsage(Base):

@@ -19,6 +19,8 @@ Items identified but **not** implemented unless explicitly requested (see `.curs
 | DB | Postgres migration for `playbook` column | SQLite migration script provided |
 | CTI | Binary PDF storage + VirusTotal-style enrichment | Excerpt + metadata only; local IOC parse only |
 | DB | Postgres migration for `cti_library_entries` / `cti_refs` | SQLite migration script provided |
+| Collaboration | Email / Slack for @mentions | In-app notifications only |
+| DB | Postgres migration for `user_notifications` / `comments.mentions` | SQLite migration script provided |
 
 ## How to use this file
 

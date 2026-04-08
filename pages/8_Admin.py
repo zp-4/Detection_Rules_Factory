@@ -10,6 +10,7 @@ from db.models import (
 )
 from services.auth import get_current_user, has_permission, load_rbac_config, require_sign_in
 from services.feature_flags import load_feature_flags, save_feature_flags
+from services.business_tags import load_business_tags, save_business_tags
 from services.mitre_coverage import get_mitre_engine
 from services.quota import set_quota_limit
 from db.repo import QuotaRepository
@@ -28,13 +29,14 @@ if not has_permission("admin"):
 
 db = SessionLocal()
 try:
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
         [
             "📊 System Statistics",
             "📈 Rule Quality Metrics",
             "🔒 RBAC",
             "🎛️ Platform",
             "📝 README Editor",
+            "🏷️ Business tags",
         ]
     )
 
@@ -453,6 +455,28 @@ try:
         st.divider()
         with st.expander("📄 Preview README (Markdown)", expanded=False):
             st.markdown(edited_content)
+
+    with tab6:
+        st.subheader("🏷️ Business tags (catalogue taxonomy)")
+        st.caption("Governed tag list and optional enforcement on the Rules catalogue.")
+        bt = load_business_tags()
+        with st.form("biz_tags_form"):
+            raw_tags = st.text_area(
+                "Allowed tags (one per line)",
+                value="\n".join(bt.get("allowed_tags") or []),
+                height=200,
+            )
+            enforce = st.checkbox(
+                "Enforce on catalogue (reject tags outside list)",
+                value=bool(bt.get("enforce_catalogue_tags")),
+            )
+            if st.form_submit_button("Save", type="primary"):
+                lines = [ln.strip() for ln in raw_tags.splitlines() if ln.strip()]
+                save_business_tags(
+                    {"allowed_tags": lines, "enforce_catalogue_tags": enforce}
+                )
+                st.success("Saved to `config/business_tags.yaml`.")
+                st.rerun()
 finally:
     db.close()
 

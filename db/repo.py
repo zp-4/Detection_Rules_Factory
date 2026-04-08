@@ -8,6 +8,7 @@ from db.models import (
     UseCase, RuleImplementation, OfflineAuditResult,
     AiAuditResult, CoverageSnapshot, DecisionLog,
     Comment, QuotaUsage, AiLock, RuleChangeLog, CtiLibraryEntry,
+    UserNotification,
 )
 
 
@@ -297,6 +298,87 @@ class CommentRepository:
             Comment.entity_type == entity_type,
             Comment.entity_id == entity_id
         ).order_by(Comment.created_at).all()
+
+
+class NotificationRepository:
+    """In-app notifications (mentions, etc.)."""
+
+    @staticmethod
+    def create(
+        db: Session,
+        *,
+        username: str,
+        message: str,
+        entity_type: Optional[str] = None,
+        entity_id: Optional[int] = None,
+        comment_id: Optional[int] = None,
+    ) -> UserNotification:
+        row = UserNotification(
+            username=username,
+            message=message,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            comment_id=comment_id,
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return row
+
+    @staticmethod
+    def list_for_user(
+        db: Session,
+        username: str,
+        limit: int = 100,
+        unread_only: bool = False,
+    ) -> List[UserNotification]:
+        q = db.query(UserNotification).filter(UserNotification.username == username)
+        if unread_only:
+            q = q.filter(UserNotification.read_at.is_(None))
+        return q.order_by(desc(UserNotification.created_at)).limit(limit).all()
+
+    @staticmethod
+    def count_unread(db: Session, username: str) -> int:
+        return (
+            db.query(UserNotification)
+            .filter(
+                UserNotification.username == username,
+                UserNotification.read_at.is_(None),
+            )
+            .count()
+        )
+
+    @staticmethod
+    def mark_read(db: Session, notification_id: int, username: str) -> bool:
+        row = (
+            db.query(UserNotification)
+            .filter(
+                UserNotification.id == notification_id,
+                UserNotification.username == username,
+            )
+            .first()
+        )
+        if not row:
+            return False
+        row.read_at = datetime.utcnow()
+        db.commit()
+        return True
+
+    @staticmethod
+    def mark_all_read(db: Session, username: str) -> int:
+        rows = (
+            db.query(UserNotification)
+            .filter(
+                UserNotification.username == username,
+                UserNotification.read_at.is_(None),
+            )
+            .all()
+        )
+        now = datetime.utcnow()
+        for r in rows:
+            r.read_at = now
+        db.commit()
+        return len(rows)
 
 
 class QuotaRepository:

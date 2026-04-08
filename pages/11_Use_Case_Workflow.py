@@ -4,7 +4,8 @@ from datetime import datetime
 
 from db.session import SessionLocal
 from db.models import DecisionLog
-from db.repo import UseCaseRepository
+from db.repo import UseCaseRepository, CommentRepository
+from services.comment_notifications import add_comment_with_notifications
 from services.auth import get_current_user, has_permission, require_sign_in
 from services.review_schedule import review_due_at_from_start
 from utils.session_persistence import restore_session_state
@@ -122,6 +123,26 @@ try:
                 UseCaseRepository.update(db, uc.id, status=new_status, **extra)
                 st.success(f"Updated **{uc.name}** from `{old}` → `{new_status}`.")
                 st.rerun()
+
+    st.divider()
+    st.subheader("Discussion")
+    for cm in CommentRepository.get_for_entity(db, "use_case", uc.id):
+        st.markdown(f"**{cm.author}** — {cm.created_at}:  \n{cm.body}")
+    if has_permission("update"):
+        with st.form("uc_comment_form"):
+            uc_body = st.text_area("Comment (@username to notify)", height=100, key="uc_comment_body")
+            if st.form_submit_button("Post comment"):
+                if uc_body.strip():
+                    add_comment_with_notifications(
+                        db,
+                        entity_type="use_case",
+                        entity_id=uc.id,
+                        use_case_id=uc.id,
+                        author=get_current_user() or "unknown",
+                        body=uc_body,
+                    )
+                    st.success("Posted.")
+                    st.rerun()
 
     st.divider()
     st.subheader("Recent decisions (all use cases)")

@@ -14,6 +14,8 @@ if sys.platform == 'win32':
 import streamlit as st
 from services.auth import get_current_user, logout
 from services.feature_flags import maintenance_message
+from db.session import SessionLocal
+from db.repo import NotificationRepository
 from utils.session_persistence import restore_session_state, persist_session_state
 
 # Restore session state on page load
@@ -45,6 +47,16 @@ if st.sidebar.button("My workspace"):
     st.switch_page("pages/10_My_Workspace.py")
 if st.sidebar.button("My profile"):
     st.switch_page("pages/9_My_Profile.py")
+try:
+    _ndb = SessionLocal()
+    try:
+        _n = NotificationRepository.count_unread(_ndb, username)
+    finally:
+        _ndb.close()
+except Exception:
+    _n = 0
+if st.sidebar.button(f"💬 Collaboration{' (' + str(_n) + ')' if _n else ''}"):
+    st.switch_page("pages/16_Collaboration.py")
 
 # Main content
 _banner = maintenance_message()
@@ -122,6 +134,9 @@ r6a, r6b = st.columns(2)
 with r6a:
     if st.button("📚 CTI library", width="stretch"):
         st.switch_page("pages/15_CTI_Library.py")
+with r6b:
+    if st.button("💬 Collaboration", width="stretch"):
+        st.switch_page("pages/16_Collaboration.py")
 
 st.divider()
 
