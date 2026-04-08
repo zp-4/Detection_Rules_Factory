@@ -484,6 +484,16 @@ uvicorn rest_api:app --host 127.0.0.1 --port 8080
 
 The API is **read-only** in this version—use Streamlit or future tooling for writes.
 
+### Sigma rules from Git
+
+Use **Git Sigma import** (`pages/18_Git_Sigma_Import.py`). Requires **`create`** permission, **`git`** on the server PATH, and network access to clone the URL (typically a **public** HTTPS repo).
+
+- Performs `git clone --depth 1 --branch <branch> <url>` into a temporary directory.
+- Recursively scans `*.yml` / `*.yaml` under an optional subdirectory (e.g. `rules/windows/process_creation`).
+- Parses Sigma documents (must contain a `detection` block); derives platform from `logsource`, MITRE technique IDs from `tags` (`attack.tXXXX`), and skips rules whose hash already exists in the catalogue.
+
+Private repositories or SSH remotes are not covered in this MVP—clone externally and use a local path import only if you extend the service.
+
 ---
 
 ## Administration

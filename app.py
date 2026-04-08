@@ -142,6 +142,9 @@ r7a, r7b = st.columns(2)
 with r7a:
     if st.button("📦 Governance", width="stretch"):
         st.switch_page("pages/17_Governance.py")
+with r7b:
+    if st.button("📥 Git Sigma import", width="stretch"):
+        st.switch_page("pages/18_Git_Sigma_Import.py")
 
 st.divider()
 

@@ -26,7 +26,7 @@ Items identified but **not** implemented unless explicitly requested (see `.curs
 | DB | Postgres migration for `config_audit_logs` | SQLite migration script provided |
 | Integrations | Webhook retries, signing (HMAC), delivery log | Fire-and-forget POST only |
 | Integrations | REST API writes (create/update rules) | Read-only MVP |
-| Integrations | Import/sync rules from Git (Sigma repos) | See roadmap #30 |
+| Integrations | Private Git / SSH remotes, scheduled sync, update-on-pull | MVP: public HTTPS + shallow clone only |
 
 ## How to use this file
 
