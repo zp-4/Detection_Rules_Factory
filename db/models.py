@@ -74,6 +74,8 @@ class RuleImplementation(Base):
     ticket_refs = Column(JSON, nullable=True)
     # production | staging | test | pilot | paused | retired
     operational_status = Column(String(32), default="production", index=True)
+    # FP handling, validation, escalation, contacts — JSON object
+    playbook = Column(JSON, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

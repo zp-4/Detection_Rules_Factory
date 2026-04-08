@@ -14,6 +14,9 @@ Items identified but **not** implemented unless explicitly requested (see `.curs
 | Docs | Per-feature runbooks | Add when features are finalized |
 | MITRE | Coverage config in DB + API | YAML file is sufficient for current scope; migrate if multi-tenant |
 | MITRE | Tactic filters on `pages/3_Mapping.py` | Catalogue + hub covered; mapping page stretch |
+| Detection | Full Sigma/Splunk/KQL evaluators for dry-run | Heuristic token overlap only |
+| Detection | Near-duplicates via embeddings / fuzzy hashing | Text `SequenceMatcher` only |
+| DB | Postgres migration for `playbook` column | SQLite migration script provided |
 
 ## How to use this file
 

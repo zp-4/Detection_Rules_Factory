@@ -5,6 +5,7 @@ from db.models import RuleImplementation
 from db.repo import RuleChangeLogRepository, RuleRepository
 from services.auth import has_permission, require_sign_in
 from services.rule_snapshot import mitre_snapshot_text
+from services.rule_playbook import format_playbook_for_diff, normalize_playbook
 from utils.diff_html import generate_colored_diff, generate_side_by_side_diff
 from utils.session_persistence import restore_session_state
 
@@ -122,6 +123,19 @@ try:
         st.markdown(mh, unsafe_allow_html=True)
     else:
         st.success("MITRE mapping fields are identical between snapshots.")
+
+    st.subheader("Playbook")
+    pb_old = format_playbook_for_diff(
+        normalize_playbook(old_state.get("playbook") if isinstance(old_state, dict) else None)
+    )
+    pb_new = format_playbook_for_diff(
+        normalize_playbook(new_state.get("playbook") if isinstance(new_state, dict) else None)
+    )
+    pb_h = generate_colored_diff(pb_old, pb_new)
+    if pb_h:
+        st.markdown(pb_h, unsafe_allow_html=True)
+    else:
+        st.success("Playbook fields are identical between snapshots.")
 
     with st.expander("Full JSON snapshots"):
         j1, j2 = st.columns(2)

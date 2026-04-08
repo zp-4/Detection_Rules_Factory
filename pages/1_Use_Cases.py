@@ -9,6 +9,7 @@ from db.repo import RuleRepository, RuleChangeLogRepository
 from db.models import RuleImplementation
 from services.auth import get_current_user, has_permission, require_sign_in
 from services.ticket_refs import parse_ticket_refs_json, ticket_refs_to_display_lines
+from services.rule_playbook import normalize_playbook, playbook_from_form
 from utils.hashing import compute_rule_hash
 from utils.session_persistence import restore_session_state, persist_session_state
 
@@ -421,6 +422,17 @@ try:
                         height=80,
                         help='[{"system":"jira","key":"SEC-1","url":"https://..."}]',
                     )
+                    with st.expander("📘 Detection playbook (optional)", expanded=False):
+                        _pbc = normalize_playbook(None)
+                        pb_fp_c = st.text_area("False positive handling", value=_pbc["false_positive"], key="cr_pb_fp")
+                        pb_val_c = st.text_area("Validation steps", value=_pbc["validation"], key="cr_pb_val")
+                        pb_esc_c = st.text_area("Escalation", value=_pbc["escalation"], key="cr_pb_esc")
+                        pb_ct_c = st.text_area(
+                            "Contacts (JSON)",
+                            value="[]",
+                            key="cr_pb_ct",
+                            help='[{"name":"","role":"","channel":""}]',
+                        )
                 
                 col_submit, col_cancel = st.columns(2)
                 with col_submit:
@@ -443,6 +455,9 @@ try:
                             else:
                                 # Compute hash with all parameters
                                 rule_hash = compute_rule_hash(rule_text, platform, rule_format)
+                                playbook_c = playbook_from_form(
+                                    pb_fp_c, pb_val_c, pb_esc_c, pb_ct_c
+                                )
 
                                 # Create a default use case if needed
                                 from db.repo import UseCaseRepository
@@ -473,6 +488,7 @@ try:
                                     mitre_technique_id=mitre_technique if mitre_technique else None,
                                     operational_status=operational_status_c,
                                     ticket_refs=parsed_refs_c if parsed_refs_c else None,
+                                    playbook=playbook_c,
                                 )
 
                                 # Log to audit trail
@@ -637,6 +653,30 @@ try:
                             height=100,
                             help='[{"system":"jira","key":"SEC-1","url":"https://jira.example/browse/SEC-1"}]',
                         )
+                        _pbe = normalize_playbook(getattr(rule, "playbook", None))
+                        with st.expander("📘 Detection playbook (optional)", expanded=False):
+                            pb_fp_e = st.text_area(
+                                "False positive handling",
+                                value=_pbe["false_positive"],
+                                key=f"ed_pb_fp_{rule.id}",
+                            )
+                            pb_val_e = st.text_area(
+                                "Validation steps",
+                                value=_pbe["validation"],
+                                key=f"ed_pb_val_{rule.id}",
+                            )
+                            pb_esc_e = st.text_area(
+                                "Escalation",
+                                value=_pbe["escalation"],
+                                key=f"ed_pb_esc_{rule.id}",
+                            )
+                            pb_ct_e = st.text_area(
+                                "Contacts (JSON)",
+                                value=json.dumps(_pbe["contacts"], indent=2)
+                                if _pbe["contacts"]
+                                else "[]",
+                                key=f"ed_pb_ct_{rule.id}",
+                            )
                     
                     col_submit, col_cancel = st.columns(2)
                     with col_submit:
@@ -664,6 +704,9 @@ try:
 
                                     # Compute new hash
                                     rule_hash = compute_rule_hash(rule_text, platform, rule_format)
+                                    playbook_e = playbook_from_form(
+                                        pb_fp_e, pb_val_e, pb_esc_e, pb_ct_e
+                                    )
 
                                     # Update rule
                                     updated_rule = RuleRepository.update(
@@ -678,6 +721,7 @@ try:
                                         mitre_technique_id=mitre_technique if mitre_technique else None,
                                         operational_status=operational_status,
                                         ticket_refs=parsed_refs if parsed_refs else None,
+                                        playbook=playbook_e,
                                     )
 
                                     # Log to audit trail
@@ -1075,6 +1119,24 @@ try:
                     # Preview of query
                     with st.expander("View Detection Query", expanded=False):
                         st.code(rule.rule_text, language="sql")
+                    _pbr = normalize_playbook(getattr(rule, "playbook", None))
+                    if (
+                        any(_pbr.get(k) for k in ("false_positive", "validation", "escalation"))
+                        or _pbr.get("contacts")
+                    ):
+                        with st.expander("📘 Detection playbook", expanded=False):
+                            if _pbr.get("false_positive"):
+                                st.markdown("**False positives**")
+                                st.markdown(_pbr["false_positive"])
+                            if _pbr.get("validation"):
+                                st.markdown("**Validation**")
+                                st.markdown(_pbr["validation"])
+                            if _pbr.get("escalation"):
+                                st.markdown("**Escalation**")
+                                st.markdown(_pbr["escalation"])
+                            if _pbr.get("contacts"):
+                                st.markdown("**Contacts**")
+                                st.json(_pbr["contacts"])
                 
                 with col_actions:
                     # Show enabled/disabled status

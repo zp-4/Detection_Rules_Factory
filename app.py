@@ -113,6 +113,11 @@ with r3:
     if st.button("🎯 MITRE coverage hub", width="stretch"):
         st.switch_page("pages/13_MITRE_Coverage_Hub.py")
 
+r5a, r5b, r5c, r5d = st.columns(4)
+with r5a:
+    if st.button("🧪 Detection engineering", width="stretch"):
+        st.switch_page("pages/14_Detection_Engineering.py")
+
 st.divider()
 
 # Status

@@ -332,6 +332,7 @@ class RuleChangeLogRepository:
             "version": rule.version,
             "ticket_refs": getattr(rule, "ticket_refs", None),
             "operational_status": getattr(rule, "operational_status", None) or "production",
+            "playbook": getattr(rule, "playbook", None),
             "created_at": rule.created_at.isoformat() if rule.created_at else None,
             "updated_at": rule.updated_at.isoformat() if rule.updated_at else None,
         }
@@ -532,6 +533,7 @@ class RuleChangeLogRepository:
                 enabled=prev.get("enabled", True),
                 ticket_refs=prev.get("ticket_refs"),
                 operational_status=prev.get("operational_status") or "production",
+                playbook=prev.get("playbook"),
                 version=(prev.get("version", 1) or 1) + 1
             )
             db.add(restored_rule)
@@ -587,6 +589,8 @@ class RuleChangeLogRepository:
                 rule.ticket_refs = prev.get("ticket_refs")
             if hasattr(rule, "operational_status"):
                 rule.operational_status = prev.get("operational_status") or "production"
+            if hasattr(rule, "playbook"):
+                rule.playbook = prev.get("playbook")
             rule.version = (rule.version or 1) + 1
             rule.updated_at = datetime.utcnow()
             
