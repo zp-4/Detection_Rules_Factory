@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from db.models import (
     UseCase, RuleImplementation, OfflineAuditResult,
     AiAuditResult, CoverageSnapshot, DecisionLog,
-    Comment, QuotaUsage, AiLock, RuleChangeLog
+    Comment, QuotaUsage, AiLock, RuleChangeLog, CtiLibraryEntry,
 )
 
 
@@ -91,6 +91,48 @@ class UseCaseRepository:
 
 
 # ========== RuleImplementation Repository ==========
+
+class CtiLibraryRepository:
+    """CRUD for reusable CTI library entries."""
+
+    @staticmethod
+    def create(db: Session, **kwargs) -> CtiLibraryEntry:
+        row = CtiLibraryEntry(**kwargs)
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return row
+
+    @staticmethod
+    def get_by_id(db: Session, entry_id: int) -> Optional[CtiLibraryEntry]:
+        return db.query(CtiLibraryEntry).filter(CtiLibraryEntry.id == entry_id).first()
+
+    @staticmethod
+    def list_all(db: Session, limit: int = 500) -> List[CtiLibraryEntry]:
+        return db.query(CtiLibraryEntry).order_by(desc(CtiLibraryEntry.updated_at)).limit(limit).all()
+
+    @staticmethod
+    def update(db: Session, entry_id: int, **kwargs) -> Optional[CtiLibraryEntry]:
+        row = CtiLibraryRepository.get_by_id(db, entry_id)
+        if not row:
+            return None
+        for key, value in kwargs.items():
+            if hasattr(row, key):
+                setattr(row, key, value)
+        row.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(row)
+        return row
+
+    @staticmethod
+    def delete(db: Session, entry_id: int) -> bool:
+        row = CtiLibraryRepository.get_by_id(db, entry_id)
+        if not row:
+            return False
+        db.delete(row)
+        db.commit()
+        return True
+
 
 class RuleRepository:
     """Repository for RuleImplementation operations."""
@@ -333,6 +375,7 @@ class RuleChangeLogRepository:
             "ticket_refs": getattr(rule, "ticket_refs", None),
             "operational_status": getattr(rule, "operational_status", None) or "production",
             "playbook": getattr(rule, "playbook", None),
+            "cti_refs": getattr(rule, "cti_refs", None),
             "created_at": rule.created_at.isoformat() if rule.created_at else None,
             "updated_at": rule.updated_at.isoformat() if rule.updated_at else None,
         }
@@ -534,6 +577,7 @@ class RuleChangeLogRepository:
                 ticket_refs=prev.get("ticket_refs"),
                 operational_status=prev.get("operational_status") or "production",
                 playbook=prev.get("playbook"),
+                cti_refs=prev.get("cti_refs"),
                 version=(prev.get("version", 1) or 1) + 1
             )
             db.add(restored_rule)
@@ -591,6 +635,8 @@ class RuleChangeLogRepository:
                 rule.operational_status = prev.get("operational_status") or "production"
             if hasattr(rule, "playbook"):
                 rule.playbook = prev.get("playbook")
+            if hasattr(rule, "cti_refs"):
+                rule.cti_refs = prev.get("cti_refs")
             rule.version = (rule.version or 1) + 1
             rule.updated_at = datetime.utcnow()
             

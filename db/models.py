@@ -76,6 +76,8 @@ class RuleImplementation(Base):
     operational_status = Column(String(32), default="production", index=True)
     # FP handling, validation, escalation, contacts — JSON object
     playbook = Column(JSON, nullable=True)
+    # CTI traceability: [{ "cti_entry_id": int, "note": str, "linked_at": str }]
+    cti_refs = Column(JSON, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -187,6 +189,25 @@ class DecisionLog(Base):
     __table_args__ = (
         Index('idx_decision_entity', 'entity_type', 'entity_id'),
     )
+
+
+class CtiLibraryEntry(Base):
+    """Reusable CTI source metadata (URL, pasted excerpt, file excerpt)."""
+
+    __tablename__ = "cti_library_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(512), nullable=False, index=True)
+    # url | paste | file_excerpt
+    source_kind = Column(String(32), nullable=False, index=True)
+    url = Column(String(2048), nullable=True)
+    excerpt_text = Column(Text, nullable=True)
+    # vendor, report_type, published_at, original_filename, etc.
+    source_metadata = Column("metadata", JSON, nullable=True)
+    tags = Column(JSON, nullable=True)
+    created_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class Comment(Base):

@@ -118,6 +118,11 @@ with r5a:
     if st.button("🧪 Detection engineering", width="stretch"):
         st.switch_page("pages/14_Detection_Engineering.py")
 
+r6a, r6b = st.columns(2)
+with r6a:
+    if st.button("📚 CTI library", width="stretch"):
+        st.switch_page("pages/15_CTI_Library.py")
+
 st.divider()
 
 # Status

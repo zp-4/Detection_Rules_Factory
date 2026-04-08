@@ -17,6 +17,8 @@ Items identified but **not** implemented unless explicitly requested (see `.curs
 | Detection | Full Sigma/Splunk/KQL evaluators for dry-run | Heuristic token overlap only |
 | Detection | Near-duplicates via embeddings / fuzzy hashing | Text `SequenceMatcher` only |
 | DB | Postgres migration for `playbook` column | SQLite migration script provided |
+| CTI | Binary PDF storage + VirusTotal-style enrichment | Excerpt + metadata only; local IOC parse only |
+| DB | Postgres migration for `cti_library_entries` / `cti_refs` | SQLite migration script provided |
 
 ## How to use this file
 

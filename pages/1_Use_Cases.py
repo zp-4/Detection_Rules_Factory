@@ -5,11 +5,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from datetime import datetime
 from db.session import SessionLocal
-from db.repo import RuleRepository, RuleChangeLogRepository
+from db.repo import RuleRepository, RuleChangeLogRepository, CtiLibraryRepository
 from db.models import RuleImplementation
 from services.auth import get_current_user, has_permission, require_sign_in
 from services.ticket_refs import parse_ticket_refs_json, ticket_refs_to_display_lines
 from services.rule_playbook import normalize_playbook, playbook_from_form
+from services.cti_refs import build_cti_refs_from_entry_ids, normalize_cti_refs
 from utils.hashing import compute_rule_hash
 from utils.session_persistence import restore_session_state, persist_session_state
 
@@ -27,6 +28,8 @@ username = get_current_user()
 # Database session
 db = SessionLocal()
 try:
+    _cti_entries = CtiLibraryRepository.list_all(db, limit=400)
+    _cti_labels = {f"{e.id} — {e.title}": e.id for e in _cti_entries}
     # Function to check and tag rules that haven't been audited in 3 months
     def check_and_tag_stale_rules(db_session):
         """Check rules and add 'to_improve' tag if not audited in 3 months."""
@@ -433,6 +436,12 @@ try:
                             key="cr_pb_ct",
                             help='[{"name":"","role":"","channel":""}]',
                         )
+                    if _cti_labels:
+                        st.multiselect(
+                            "CTI library sources (optional)",
+                            options=list(_cti_labels.keys()),
+                            key="cr_cti",
+                        )
                 
                 col_submit, col_cancel = st.columns(2)
                 with col_submit:
@@ -458,6 +467,11 @@ try:
                                 playbook_c = playbook_from_form(
                                     pb_fp_c, pb_val_c, pb_esc_c, pb_ct_c
                                 )
+                                _ctp = st.session_state.get("cr_cti") or []
+                                cti_refs_c = build_cti_refs_from_entry_ids(
+                                    [_cti_labels[k] for k in _ctp if k in _cti_labels],
+                                    "",
+                                ) or None
 
                                 # Create a default use case if needed
                                 from db.repo import UseCaseRepository
@@ -489,6 +503,7 @@ try:
                                     operational_status=operational_status_c,
                                     ticket_refs=parsed_refs_c if parsed_refs_c else None,
                                     playbook=playbook_c,
+                                    cti_refs=cti_refs_c,
                                 )
 
                                 # Log to audit trail
@@ -677,6 +692,18 @@ try:
                                 else "[]",
                                 key=f"ed_pb_ct_{rule.id}",
                             )
+                        if _cti_labels:
+                            _cur_cti_ids = {
+                                x.get("cti_entry_id")
+                                for x in normalize_cti_refs(getattr(rule, "cti_refs", None))
+                            }
+                            _def_cti = [k for k, v in _cti_labels.items() if v in _cur_cti_ids]
+                            st.multiselect(
+                                "CTI library sources",
+                                options=list(_cti_labels.keys()),
+                                default=_def_cti,
+                                key=f"ed_cti_{rule.id}",
+                            )
                     
                     col_submit, col_cancel = st.columns(2)
                     with col_submit:
@@ -707,6 +734,11 @@ try:
                                     playbook_e = playbook_from_form(
                                         pb_fp_e, pb_val_e, pb_esc_e, pb_ct_e
                                     )
+                                    _cte = st.session_state.get(f"ed_cti_{rule.id}") or []
+                                    cti_refs_e = build_cti_refs_from_entry_ids(
+                                        [_cti_labels[k] for k in _cte if k in _cti_labels],
+                                        "",
+                                    ) or None
 
                                     # Update rule
                                     updated_rule = RuleRepository.update(
@@ -722,6 +754,7 @@ try:
                                         operational_status=operational_status,
                                         ticket_refs=parsed_refs if parsed_refs else None,
                                         playbook=playbook_e,
+                                        cti_refs=cti_refs_e,
                                     )
 
                                     # Log to audit trail
@@ -1137,6 +1170,10 @@ try:
                             if _pbr.get("contacts"):
                                 st.markdown("**Contacts**")
                                 st.json(_pbr["contacts"])
+                    _cti_r = normalize_cti_refs(getattr(rule, "cti_refs", None))
+                    if _cti_r:
+                        with st.expander("📚 CTI sources", expanded=False):
+                            st.json(_cti_r)
                 
                 with col_actions:
                     # Show enabled/disabled status

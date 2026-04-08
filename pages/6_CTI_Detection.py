@@ -21,10 +21,11 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 from db.session import SessionLocal
 from db.models import RuleImplementation, UseCase
-from db.repo import RuleRepository, UseCaseRepository
+from db.repo import RuleRepository, UseCaseRepository, CtiLibraryRepository
 from src.ai_engine import AIEngine
 from services.auth import get_current_user, has_permission, require_sign_in
 from db.repo import RuleChangeLogRepository
+from services.cti_refs import build_cti_refs_from_entry_ids
 from utils.hashing import compute_rule_hash
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -259,6 +260,39 @@ with tab1:
     
     # Analyze button (explicit click — no keyboard shortcut)
     if cti_content and len(cti_content.strip()) > 50:
+        if has_permission("create") or has_permission("update"):
+            with st.expander("📚 Save this content to the CTI library", expanded=False):
+                lib_title = st.text_input("Title for library entry", key="cti_lib_save_title")
+                lib_tags = st.text_input("Tags (comma-separated)", key="cti_lib_save_tags")
+                if st.button("Save to CTI library", key="cti_lib_save_btn"):
+                    if not lib_title.strip():
+                        st.error("Title is required.")
+                    else:
+                        try:
+                            sk = "url" if input_method == "URL" else (
+                                "file_excerpt" if input_method in ("PDF File", "Excel File") else "paste"
+                            )
+                            url_val = st.session_state.get("cti_source_url") if input_method == "URL" else None
+                            tags_list = [t.strip() for t in lib_tags.split(",") if t.strip()]
+                            ldb = SessionLocal()
+                            try:
+                                CtiLibraryRepository.create(
+                                    ldb,
+                                    title=lib_title.strip()[:500],
+                                    source_kind=sk,
+                                    url=url_val,
+                                    excerpt_text=cti_content[:200000],
+                                    source_metadata={
+                                        "input_method": input_method,
+                                    },
+                                    tags=tags_list or None,
+                                    created_by=username or None,
+                                )
+                            finally:
+                                ldb.close()
+                            st.success("Saved to CTI library — you can link it when adding rules.")
+                        except Exception as ex:
+                            st.error(str(ex))
         st.divider()
         st.subheader("Run analysis")
         st.caption(
@@ -347,6 +381,13 @@ with tab2:
                 st.info(f"📋 **Analysis Summary:** {result['summary']}")
             
             st.divider()
+
+            _ldb_lib = SessionLocal()
+            try:
+                _lib_list = CtiLibraryRepository.list_all(_ldb_lib)
+            finally:
+                _ldb_lib.close()
+            _lib_map = {f"{e.id} — {e.title}": e.id for e in _lib_list}
             
             # Display each proposed rule
             for idx, rule_data in enumerate(result['rules'], 1):
@@ -441,6 +482,14 @@ with tab2:
                         st.markdown("**💡 AI Reasoning:**")
                         st.info(rule_data.get('reasoning', ''))
                     
+                    if _lib_map:
+                        st.multiselect(
+                            "Link CTI library entries (optional)",
+                            options=list(_lib_map.keys()),
+                            key=f"cti_lib_pick_{idx}",
+                            help="Attach traceability to sources saved under CTI library.",
+                        )
+                    
                     st.divider()
                     
                     # Action buttons
@@ -481,6 +530,14 @@ with tab2:
                                             )
                                             use_case_id = default_uc.id
                                         
+                                        cti_refs_val = None
+                                        if _lib_map:
+                                            _picked = st.session_state.get(f"cti_lib_pick_{idx}", [])
+                                            _ids = [_lib_map[k] for k in _picked if k in _lib_map]
+                                            cti_refs_val = build_cti_refs_from_entry_ids(
+                                                _ids, "CTI Detection opportunity"
+                                            ) or None
+                                        
                                         # Create rule
                                         new_rule = RuleRepository.create(
                                             db,
@@ -491,7 +548,8 @@ with tab2:
                                             rule_format=rule_format,
                                             rule_hash=rule_hash,
                                             tags=tags_list if tags_list else None,
-                                            mitre_technique_id=mitre_technique_id if mitre_technique_id else None
+                                            mitre_technique_id=mitre_technique_id if mitre_technique_id else None,
+                                            cti_refs=cti_refs_val,
                                         )
                                         
                                         # Log to audit trail
