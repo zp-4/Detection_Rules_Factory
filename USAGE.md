@@ -286,6 +286,19 @@ Configured in `config/rbac.yaml`:
 - **contributor1** — Can create and edit rules
 - **reader1** — Read-only access (cannot modify anything)
 
+### Sign-in (demo vs password)
+
+- If a user has **no** `password_hash` in `config/rbac.yaml`, the portal accepts **username only** (leave the password field empty). This is the default for local demos.
+- If you set **`password_hash`** for a user, that account **requires** the matching password. Generate a hash (PBKDF2-SHA256) and paste the line under the user:
+
+  ```bash
+  python3 scripts/hash_password.py
+  ```
+
+  Or non-interactively: `python3 scripts/hash_password.py 'your-secret'`
+
+- On **Streamlit Community Cloud**, you can override users via **Secrets** (`rbac` in `.streamlit/secrets.toml`) instead of committing `rbac.yaml` with real hashes—see Streamlit docs for structured secrets.
+
 ---
 
 ## AI analysis infrastructure
