@@ -148,31 +148,65 @@ section.main [data-testid="baseButton-primary"]:hover {
 /* Sidebar: Streamlit adds large gaps between each widget — tighten */
 [data-testid="stSidebar"] [class*="stElementContainer"],
 [data-testid="stSidebar"] [class*="element-container"] {
-  margin-bottom: 0.35rem !important;
+  margin-bottom: 0.2rem !important;
 }
 [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div {
-  gap: 0.35rem !important;
+  gap: 0.2rem !important;
 }
 [data-testid="stSidebar"] hr {
-  margin: 0.45rem 0 !important;
+  margin: 0.3rem 0 !important;
   border-color: rgba(148, 163, 184, 0.2) !important;
 }
 
-/* Sidebar alerts (success / warning) — less padding */
+/* Sidebar alerts (success / warning) — compact session strip */
 [data-testid="stSidebar"] [data-testid="stAlert"] {
-  padding: 0.45rem 0.6rem !important;
-  margin-bottom: 0.25rem !important;
+  padding: 0.28rem 0.45rem !important;
+  margin-bottom: 0.12rem !important;
+}
+[data-testid="stSidebar"] [data-testid="stAlert"] p {
+  line-height: 1.35 !important;
+  margin: 0 !important;
+  font-size: 0.88rem !important;
 }
 
-/* Sidebar inner padding (scroll area) */
+/* Sidebar inner padding — use horizontal space, less vertical air */
 [data-testid="stSidebar"] [data-testid="stSidebarContent"] {
-  padding-top: 0.5rem !important;
-  padding-bottom: 0.75rem !important;
+  padding-top: 0.35rem !important;
+  padding-bottom: 0.5rem !important;
+  padding-left: 0.45rem !important;
+  padding-right: 0.45rem !important;
+}
+
+/* Top home / brand page link — dark card, not pale blue */
+[data-testid="stSidebar"] [data-testid^="stPageLink"] {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(148, 163, 184, 0.18) !important;
+  border-radius: 10px !important;
+  padding: 0.4rem 0.5rem !important;
+  margin-bottom: 0.15rem !important;
+}
+[data-testid="stSidebar"] [data-testid^="stPageLink"] p,
+[data-testid="stSidebar"] [data-testid^="stPageLink"] span {
+  color: #f1f5f9 !important;
+  font-weight: 600 !important;
+  font-size: 0.92rem !important;
+}
+
+/* Nav links inside expanders — same dark chrome, minimal stack gap */
+[data-testid="stSidebar"] .streamlit-expander [data-testid^="stPageLink"] {
+  margin-bottom: 0.12rem !important;
+  padding: 0.32rem 0.45rem !important;
+  font-size: 0.86rem !important;
+}
+[data-testid="stSidebar"] .streamlit-expander [data-testid^="stPageLink"] p,
+[data-testid="stSidebar"] .streamlit-expander [data-testid^="stPageLink"] span {
+  font-size: 0.86rem !important;
+  font-weight: 500 !important;
 }
 
 /* Sidebar: expander groups (nav) — dark chrome, tight */
 [data-testid="stSidebar"] .streamlit-expander {
-  margin-bottom: 0.3rem !important;
+  margin-bottom: 0.15rem !important;
   border: 1px solid rgba(148, 163, 184, 0.12) !important;
   border-radius: 10px !important;
   background: rgba(0, 0, 0, 0.12) !important;
@@ -180,11 +214,14 @@ section.main [data-testid="baseButton-primary"]:hover {
 [data-testid="stSidebar"] .streamlit-expanderHeader {
   background: transparent !important;
   color: #e2e8f0 !important;
-  font-size: 0.88rem !important;
+  font-size: 0.85rem !important;
+  padding-top: 0.3rem !important;
+  padding-bottom: 0.3rem !important;
+  min-height: 0 !important;
 }
 [data-testid="stSidebar"] .streamlit-expanderContent {
-  padding-top: 0.25rem !important;
-  padding-bottom: 0.35rem !important;
+  padding-top: 0.15rem !important;
+  padding-bottom: 0.25rem !important;
 }
 
 [data-testid="stSidebar"] [data-testid="baseButton-primary"],
@@ -195,6 +232,8 @@ section.main [data-testid="baseButton-primary"]:hover {
   border: 1px solid rgba(148, 163, 184, 0.2) !important;
   color: #e2e8f0 !important;
   transition: background 0.15s ease, border-color 0.15s ease !important;
+  padding: 0.35rem 0.65rem !important;
+  min-height: 0 !important;
 }
 [data-testid="stSidebar"] [data-testid="baseButton-primary"]:hover,
 [data-testid="stSidebar"] [data-testid="baseButton-secondary"]:hover {

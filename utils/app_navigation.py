@@ -166,6 +166,7 @@ def render_app_sidebar(username: str, unread_notifications: int | None = None) -
         "Sign out",
         key="sb_signout_global",
         icon=":material/logout:",
+        type="secondary",
         use_container_width=True,
     ):
         logout()
