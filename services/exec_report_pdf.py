@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 
 from fpdf import FPDF
+from fpdf.enums import XPos, YPos
 
 
 def build_executive_pdf(metrics: Dict[str, Any], title: str = "Executive summary") -> bytes:
@@ -13,17 +14,17 @@ def build_executive_pdf(metrics: Dict[str, Any], title: str = "Executive summary
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, "Detection Rules Factory", ln=True, align="C")
+    pdf.cell(0, 10, "Detection Rules Factory", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
     pdf.set_font("Helvetica", "", 11)
-    pdf.cell(0, 8, title, ln=True, align="C")
+    pdf.cell(0, 8, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="C")
     pdf.ln(4)
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     pdf.set_font("Helvetica", "I", 9)
-    pdf.cell(0, 6, f"Generated: {ts}", ln=True)
+    pdf.cell(0, 6, f"Generated: {ts}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(4)
 
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "Key metrics", ln=True)
+    pdf.cell(0, 8, "Key metrics", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.set_font("Helvetica", "", 10)
 
     lines = [
@@ -38,22 +39,22 @@ def build_executive_pdf(metrics: Dict[str, Any], title: str = "Executive summary
         f"Archived rules (total): {metrics.get('archived_total', 0)}",
     ]
     for line in lines:
-        pdf.cell(0, 6, line, ln=True)
+        pdf.cell(0, 6, line, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     pdf.ln(4)
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "Rules by platform", ln=True)
+    pdf.cell(0, 8, "Rules by platform", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.set_font("Helvetica", "", 10)
     plats = metrics.get("platforms") or {}
     if not plats:
-        pdf.cell(0, 6, "(none)", ln=True)
+        pdf.cell(0, 6, "(none)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     else:
         for plat, cnt in list(plats.items())[:20]:
-            pdf.cell(0, 6, f"  - {plat}: {cnt}", ln=True)
+            pdf.cell(0, 6, f"  - {plat}: {cnt}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         if len(plats) > 20:
-            pdf.cell(0, 6, f"  ... +{len(plats) - 20} more platforms", ln=True)
+            pdf.cell(0, 6, f"  ... +{len(plats) - 20} more platforms", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-    raw = pdf.output(dest="S")
+    raw = pdf.output()
     if isinstance(raw, (bytes, bytearray)):
         return bytes(raw)
     return str(raw).encode("latin-1", errors="replace")

@@ -54,7 +54,7 @@ def summarize_quarterly_queue(rules: list[Any], now: datetime | None = None) -> 
     Rules are queued when tagged `to_improve` and their last audit date is
     missing or older than the current quarter start.
     """
-    ref = _utc_naive(now or datetime.utcnow())
+    ref = _utc_naive(now or datetime.now(timezone.utc))
     q_start = quarter_start(ref)
     q_label = quarter_label(ref)
 
