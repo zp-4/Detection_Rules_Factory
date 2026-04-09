@@ -17,6 +17,7 @@ import streamlit as st
 from services.auth import ROLES, get_current_user, has_permission
 from services.feature_flags import maintenance_message
 from services.onboarding import compute_progress, mark_step
+from services.security_posture import security_findings
 from utils.mitre_links import technique_links_markdown
 from utils.session_persistence import restore_session_state
 from utils.dashboard_home import load_home_dashboard_stats
@@ -44,6 +45,8 @@ render_app_sidebar(username, _n_unread)
 _banner = maintenance_message()
 if _banner:
     st.warning(_banner)
+for finding in security_findings():
+    st.warning(f"Security posture: {finding}")
 
 _has_import = stats.n_rules > 0
 _has_audit = stats.n_audits_total > 0

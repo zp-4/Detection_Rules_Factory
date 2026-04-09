@@ -1,7 +1,7 @@
 """Simple RBAC authentication service."""
 import yaml
 import os
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, Any
 import streamlit as st
 
 from utils.password_hashing import verify_password
@@ -29,7 +29,7 @@ def load_rbac_config() -> Dict:
     # Try config file
     config_path = os.path.join("config", "rbac.yaml")
     if os.path.exists(config_path):
-        with open(config_path, 'r') as f:
+        with open(config_path, 'r', encoding='utf-8') as f:
             return yaml.safe_load(f)
     
     # Default config

@@ -1,8 +1,12 @@
 """Outbound webhooks for integration events (Slack, Teams, etc.)."""
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import logging
 import os
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -17,7 +21,14 @@ WEBHOOKS_PATH = os.path.join("config", "webhooks.yaml")
 
 
 def _defaults() -> Dict[str, Any]:
-    return {"enabled": False, "endpoints": []}
+    return {
+        "enabled": False,
+        "endpoints": [],
+        "timeout_seconds": 8,
+        "retries": 2,
+        "retry_backoff_seconds": 1.2,
+        "signing_secret_env": "",
+    }
 
 
 def load_webhook_config() -> Dict[str, Any]:
@@ -35,16 +46,35 @@ def load_webhook_config() -> Dict[str, Any]:
     return data
 
 
+def _secret_from_env(secret_env: str) -> str:
+    key = str(secret_env or "").strip()
+    if not key:
+        return ""
+    return str(os.getenv(key, "")).strip()
+
+
+def _sign_payload(*, secret: str, timestamp: str, body_bytes: bytes) -> str:
+    msg = timestamp.encode("utf-8") + b"." + body_bytes
+    return hmac.new(secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+
+
+def _json_bytes(payload: Dict[str, Any]) -> bytes:
+    return json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+
+
+def _should_retry(status_code: int) -> bool:
+    return status_code == 429 or status_code >= 500
+
+
 def dispatch(event: str, data: Dict[str, Any]) -> None:
-    """POST JSON to each configured endpoint that subscribes to ``event``. Failures are logged only."""
+    """POST signed JSON to each endpoint; retries on transient errors."""
     cfg = load_webhook_config()
     if not cfg.get("enabled"):
         return
-    payload = {
-        "event": event,
-        "occurred_at": datetime.now(timezone.utc).isoformat(),
-        "data": data,
-    }
+    timeout = float(cfg.get("timeout_seconds", 8) or 8)
+    retries = int(cfg.get("retries", 2) or 2)
+    backoff = float(cfg.get("retry_backoff_seconds", 1.2) or 1.2)
+
     endpoints: List[Dict[str, Any]] = cfg.get("endpoints") or []
     for ep in endpoints:
         if not isinstance(ep, dict):
@@ -55,10 +85,46 @@ def dispatch(event: str, data: Dict[str, Any]) -> None:
         url = (ep.get("url") or "").strip()
         if not url:
             continue
-        try:
-            requests.post(url, json=payload, timeout=8)
-        except Exception as ex:
-            logger.warning("webhook POST failed for %s: %s", url[:48], ex)
+        payload = {
+            "event": event,
+            "occurred_at": datetime.now(timezone.utc).isoformat(),
+            "data": data,
+        }
+        body = _json_bytes(payload)
+        timestamp = datetime.now(timezone.utc).isoformat()
+        secret_env = str(ep.get("signing_secret_env") or cfg.get("signing_secret_env") or "").strip()
+        secret = _secret_from_env(secret_env)
+        headers = {
+            "Content-Type": "application/json",
+            "X-DRF-Event": event,
+            "X-DRF-Timestamp": timestamp,
+        }
+        if secret:
+            headers["X-DRF-Signature"] = _sign_payload(
+                secret=secret,
+                timestamp=timestamp,
+                body_bytes=body,
+            )
+
+        max_attempts = max(1, retries + 1)
+        for attempt in range(1, max_attempts + 1):
+            try:
+                resp = requests.post(url, data=body, headers=headers, timeout=timeout)
+                if _should_retry(int(resp.status_code)) and attempt < max_attempts:
+                    time.sleep(backoff * attempt)
+                    continue
+                if int(resp.status_code) >= 400:
+                    logger.warning(
+                        "webhook POST failed for %s: status=%s",
+                        url[:48],
+                        resp.status_code,
+                    )
+                break
+            except Exception as ex:
+                if attempt < max_attempts:
+                    time.sleep(backoff * attempt)
+                    continue
+                logger.warning("webhook POST failed for %s: %s", url[:48], ex)
 
 
 def emit_use_case_approved(

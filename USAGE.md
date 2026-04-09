@@ -298,6 +298,7 @@ Configured in `config/rbac.yaml`:
   Or non-interactively: `python3 scripts/hash_password.py 'your-secret'`
 
 - On **Streamlit Community Cloud**, you can override users via **Secrets** (`rbac` in `.streamlit/secrets.toml`) instead of committing `rbac.yaml` with real hashes—see Streamlit docs for structured secrets.
+- Brute-force protection is enabled by default (`config/login_security.yaml`): after repeated failures, the account is temporarily locked (`max_failures`, `window_seconds`, `lockout_seconds`).
 
 ---
 
@@ -362,6 +363,14 @@ export DATABASE_URL="postgresql://user:pass@localhost/dbname"
 ```
 
 Use Alembic or your own migration strategy for production.
+
+### Security posture checks (production)
+
+Set `APP_ENV=production` to enable runtime posture checks on the dashboard:
+
+- warn if `DATABASE_URL` still points to SQLite,
+- warn if RBAC users are missing `password_hash`,
+- warn if enabled webhook endpoints have no signing secret resolved from env.
 
 ---
 
@@ -456,6 +465,10 @@ New databases can use `python init_db.py` to create the current schema. Older da
 ### Outbound webhooks
 
 Configure `config/webhooks.yaml`. Set `enabled: true` and add one or more `endpoints` with an HTTPS `url` and an `events` list.
+Production recommendation:
+
+- set `signing_secret_env` (global or per endpoint) to an environment variable containing a secret,
+- keep `retries` > 0 for transient network failures.
 
 Emitted events:
 
@@ -475,7 +488,14 @@ Each POST body is JSON:
 }
 ```
 
-Compatible with **Slack incoming webhooks** and any HTTPS endpoint that accepts `application/json`. Failures are logged only; the Streamlit UI is not blocked.
+Headers include:
+
+- `X-DRF-Event`
+- `X-DRF-Timestamp`
+- `X-DRF-Signature` (when signing secret is configured):  
+  `hex(hmac_sha256(secret, "<timestamp>.<raw_json_body>"))`
+
+Compatible with **Slack incoming webhooks** and any HTTPS endpoint that accepts `application/json`. Delivery failures are retried according to `retries` / `retry_backoff_seconds`; the Streamlit UI remains non-blocking.
 
 ### Read-only REST API (optional)
 

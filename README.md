@@ -19,8 +19,9 @@ A **Streamlit** application for managing SOC detection rules, analysing **MITRE 
 - **📦 Governance** — Retention hints, executive PDF, archival.
 - **⚙️ Administration** — Statistics, quality metrics, RBAC view, platform flags, quotas, config audit log, business tags.
 - **🔒 RBAC** — Roles (`reader` → `admin`) enforced across pages; optional password hashing (PBKDF2).
+- **🛡️ Login security** — Username rate limiting / temporary lockout via `config/login_security.yaml`.
 - **🤖 AI** — Audits, mapping, CTI extraction; quotas per team; session-friendly locking and duplicate reuse.
-- **🔌 Integrations** — Optional outbound **webhooks** (use case approved, mapping changed, offline audit completed) via `config/webhooks.yaml`; optional **read-only REST API** (`rest_api.py`) with bearer tokens in `config/rest_api.yaml`; **Sigma import from Git** (shallow clone + YAML scan, page **Git Sigma import**).
+- **🔌 Integrations** — Optional outbound **webhooks** (signed HMAC + retries) via `config/webhooks.yaml`; optional **read-only REST API** (`rest_api.py`) with bearer tokens in `config/rest_api.yaml`; **Sigma import from Git** (shallow clone + YAML scan, page **Git Sigma import**).
 - **✍️ AI rule draft** — Natural-language → rule skeleton + suggested MITRE IDs + false-positive checklist (`pages/19_Rule_Draft_Assistant.py`, team AI quota).
 
 For **step-by-step workflows**, RBAC tables, configuration, and data model details, see **[USAGE.md](USAGE.md)**.

@@ -19,6 +19,11 @@ from services.auth import (
     load_rbac_config,
     user_has_password,
 )
+from services.login_security import (
+    check_login_allowed,
+    clear_failures,
+    register_failed_attempt,
+)
 
 restore_session_state()
 
@@ -72,10 +77,19 @@ with mid:
                     st.error("Please enter a username.")
                 elif user_has_password(u) and not (login_password and login_password.strip()):
                     st.error("Password required for this account.")
-                elif login(u, login_password or ""):
-                    st.switch_page("app.py")
                 else:
-                    st.error("Invalid username or password.")
+                    decision = check_login_allowed(u)
+                    if not decision.allowed:
+                        st.error(
+                            "Too many failed attempts. "
+                            f"Retry in ~{decision.retry_after_seconds}s."
+                        )
+                    elif login(u, login_password or ""):
+                        clear_failures(u)
+                        st.switch_page("app.py")
+                    else:
+                        register_failed_attempt(u)
+                        st.error("Invalid username or password.")
 
     cfg = load_rbac_config()
     known = sorted(cfg.get("users", {}).keys())

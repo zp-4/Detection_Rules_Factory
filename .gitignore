@@ -70,3 +70,4 @@ Desktop.ini
 FEATURE_ROADMAP_LOCAL.md
 config/saved_views.yaml
 config/onboarding_state.yaml
+config/login_rate_limit_state.yaml

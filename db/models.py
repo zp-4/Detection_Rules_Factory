@@ -1,7 +1,6 @@
 """SQLAlchemy models for Use Case Factory."""
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey, Float, Boolean, Index
-from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
 
 Base = declarative_base()

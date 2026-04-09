@@ -1,7 +1,13 @@
-# Outbound webhooks (Slack incoming webhook URL, Microsoft Power Automate, generic HTTPS POST).
+# Outbound webhooks (Slack incoming webhook URL, Power Automate, generic HTTPS POST).
 # Payload shape: { "event": "<name>", "occurred_at": "<ISO8601 UTC>", "data": { ... } }
 # Events: use_case_approved | mapping_changed | audit_completed
 enabled: false
+timeout_seconds: 8
+retries: 2
+retry_backoff_seconds: 1.2
+# Optional HMAC SHA256 signing secret env var (recommended in production).
+# Signature header: X-DRF-Signature = hex(hmac_sha256(secret, "<timestamp>.<raw_json_body>"))
+signing_secret_env: ""
 endpoints: []
 # Example:
 # endpoints:
@@ -10,3 +16,5 @@ endpoints: []
 #       - use_case_approved
 #       - mapping_changed
 #       - audit_completed
+#     # Optional per-endpoint override:
+#     # signing_secret_env: "DRF_WEBHOOK_SECRET_SECURITY"
