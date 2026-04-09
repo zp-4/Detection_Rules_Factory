@@ -6,7 +6,30 @@ import streamlit as st
 
 from utils.streamlit_ui import apply_global_styles
 
-# (label, page path, stable key suffix for st.button)
+# Material Symbols (Streamlit native :material/...:) — professional, monochrome
+_NAV_MATERIAL: dict[str, str] = {
+    "ws": ":material/workspaces:",
+    "rules": ":material/view_kanban:",
+    "collab": ":material/forum:",
+    "audit": ":material/verified_user:",
+    "mapping": ":material/schema:",
+    "dash": ":material/insert_chart:",
+    "group": ":material/groups:",
+    "hub": ":material/hub:",
+    "cti_det": ":material/radar:",
+    "cti_lib": ":material/library_books:",
+    "workflow": ":material/account_tree:",
+    "diff": ":material/compare_arrows:",
+    "trail": ":material/history:",
+    "de": ":material/science:",
+    "gov": ":material/gavel:",
+    "draft": ":material/edit_note:",
+    "ai": ":material/tune:",
+    "git": ":material/cloud_download:",
+    "admin": ":material/admin_panel_settings:",
+}
+
+# (label, page path, stable key suffix)
 _NAV_GROUPS: list[tuple[str, list[tuple[str, str, str]]]] = [
     (
         "Daily work",
@@ -82,12 +105,13 @@ def _collab_label(unread: int) -> str:
     return "Collaboration"
 
 
+def _icon_for_suffix(suffix: str) -> str:
+    return _NAV_MATERIAL.get(suffix, ":material/chevron_right:")
+
+
 def render_sidebar_navigation(username: str, unread_notifications: int = 0) -> None:
     """Grouped page links (used under the app chrome)."""
     st.sidebar.markdown("### Navigate")
-    if st.sidebar.button("Home", key="sb_nav_home", use_container_width=True):
-        st.switch_page("app.py")
-    st.sidebar.divider()
     for title, items in _NAV_GROUPS:
         st.sidebar.caption(title.upper())
         for label, path, suffix in items:
@@ -95,11 +119,21 @@ def render_sidebar_navigation(username: str, unread_notifications: int = 0) -> N
             if suffix == "collab":
                 display = _collab_label(unread_notifications)
             key = f"sb_nav_{suffix}"
-            if st.sidebar.button(display, key=key, use_container_width=True):
+            if st.sidebar.button(
+                display,
+                key=key,
+                icon=_icon_for_suffix(suffix),
+                use_container_width=True,
+            ):
                 st.switch_page(path)
     st.sidebar.divider()
     st.sidebar.caption("Account")
-    if st.sidebar.button("My profile", key="sb_nav_profile", use_container_width=True):
+    if st.sidebar.button(
+        "My profile",
+        key="sb_nav_profile",
+        icon=":material/person:",
+        use_container_width=True,
+    ):
         st.switch_page("pages/9_My_Profile.py")
 
 
@@ -115,7 +149,13 @@ def render_app_sidebar(username: str, unread_notifications: int | None = None) -
     if unread_notifications is None:
         unread_notifications = count_unread_notifications(username)
 
-    st.sidebar.title("🏭 Detection Rules Factory")
+    st.sidebar.page_link(
+        "app.py",
+        label="Detection Rules Factory",
+        icon=":material/layers:",
+        help="Home",
+        use_container_width=True,
+    )
     _msg = maintenance_message()
     if _msg:
         st.sidebar.warning(_msg)
@@ -124,7 +164,12 @@ def render_app_sidebar(username: str, unread_notifications: int | None = None) -
         f"Role **{st.session_state.get('user_role', 'N/A')}** · "
         f"Team **{st.session_state.get('user_team', 'N/A')}**"
     )
-    if st.sidebar.button("Sign out", key="sb_signout_global", use_container_width=True):
+    if st.sidebar.button(
+        "Sign out",
+        key="sb_signout_global",
+        icon=":material/logout:",
+        use_container_width=True,
+    ):
         logout()
         st.rerun()
     st.sidebar.divider()
@@ -146,5 +191,10 @@ def render_home_quick_links(unread_notifications: int = 0) -> None:
                     display = _collab_label(unread_notifications) if suffix == "collab" else label
                     key = f"home_{suffix}"
                     with cols[i % ncols]:
-                        if st.button(display, key=key, use_container_width=True):
+                        if st.button(
+                            display,
+                            key=key,
+                            icon=_icon_for_suffix(suffix),
+                            use_container_width=True,
+                        ):
                             st.switch_page(path)
