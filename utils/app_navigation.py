@@ -97,7 +97,7 @@ def render_sidebar_navigation(username: str, unread_notifications: int = 0) -> N
             key = f"sb_nav_{suffix}"
             if st.sidebar.button(display, key=key, use_container_width=True):
                 st.switch_page(path)
-        st.sidebar.divider()
+    st.sidebar.divider()
     st.sidebar.caption("Account")
     if st.sidebar.button("My profile", key="sb_nav_profile", use_container_width=True):
         st.switch_page("pages/9_My_Profile.py")
@@ -120,8 +120,10 @@ def render_app_sidebar(username: str, unread_notifications: int | None = None) -
     if _msg:
         st.sidebar.warning(_msg)
     st.sidebar.success(f"Logged in as: **{username}**")
-    st.sidebar.caption(f"Role: {st.session_state.get('user_role', 'N/A')}")
-    st.sidebar.caption(f"Team: {st.session_state.get('user_team', 'N/A')}")
+    st.sidebar.caption(
+        f"Role **{st.session_state.get('user_role', 'N/A')}** · "
+        f"Team **{st.session_state.get('user_team', 'N/A')}**"
+    )
     if st.sidebar.button("Sign out", key="sb_signout_global", use_container_width=True):
         logout()
         st.rerun()

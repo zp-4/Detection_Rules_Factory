@@ -88,14 +88,21 @@ section.main [data-testid="baseButton-primary"]:hover {
   border: 1px solid var(--drf-line) !important;
 }
 
-/* Expanders */
+/* Expanders — less dead space between stacked expanders */
+.streamlit-expander {
+  margin-bottom: 0.35rem !important;
+}
 .streamlit-expanderHeader {
   font-weight: 600 !important;
   border-radius: 10px !important;
   background: rgba(15, 23, 42, 0.04) !important;
+  min-height: auto !important;
+  padding-top: 0.45rem !important;
+  padding-bottom: 0.45rem !important;
 }
 .streamlit-expanderContent {
   border-radius: 0 0 10px 10px !important;
+  padding-top: 0.35rem !important;
 }
 
 /* Metrics / success blocks in main */
@@ -110,16 +117,57 @@ section.main [data-testid="baseButton-primary"]:hover {
   box-shadow: 4px 0 24px rgba(15, 23, 42, 0.12);
 }
 
+/* Sidebar headings — all sources (title(), markdown h3, etc.) */
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3,
 [data-testid="stSidebar"] [data-testid="stMarkdown"] h1,
 [data-testid="stSidebar"] [data-testid="stMarkdown"] h2,
 [data-testid="stSidebar"] [data-testid="stMarkdown"] h3 {
-  color: var(--drf-sidebar-heading) !important;
+  color: #f8fafc !important;
   font-weight: 700 !important;
   letter-spacing: -0.02em !important;
+  border: none !important;
+}
+[data-testid="stSidebar"] h1 {
+  font-size: 1.15rem !important;
+  margin: 0 0 0.35rem 0 !important;
+  padding: 0 !important;
+}
+[data-testid="stSidebar"] h3 {
+  margin: 0.25rem 0 0.2rem 0 !important;
+  font-size: 0.95rem !important;
 }
 
 [data-testid="stSidebar"] [data-testid="stCaption"] {
   color: #94a3b8 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0.15rem !important;
+}
+
+/* Sidebar: Streamlit adds large gaps between each widget — tighten */
+[data-testid="stSidebar"] [class*="stElementContainer"],
+[data-testid="stSidebar"] [class*="element-container"] {
+  margin-bottom: 0.35rem !important;
+}
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div {
+  gap: 0.35rem !important;
+}
+[data-testid="stSidebar"] hr {
+  margin: 0.45rem 0 !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+}
+
+/* Sidebar alerts (success / warning) — less padding */
+[data-testid="stSidebar"] [data-testid="stAlert"] {
+  padding: 0.45rem 0.6rem !important;
+  margin-bottom: 0.25rem !important;
+}
+
+/* Sidebar inner padding (scroll area) */
+[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.75rem !important;
 }
 
 [data-testid="stSidebar"] [data-testid="baseButton-primary"],
@@ -158,7 +206,7 @@ section.main [data-testid="baseButton-primary"]:hover {
   border: 1px solid #ccfbf1;
   border-radius: 16px;
   padding: 1.15rem 1.2rem 1.1rem 1.2rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.6rem;
   box-shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
 }
 .drf-hero-kicker {
@@ -235,7 +283,13 @@ section.main [data-testid="baseButton-primary"]:hover {
   border-color: #e2e8f0 !important;
   background: #ffffff !important;
   box-shadow: 0 1px 8px rgba(15, 23, 42, 0.04) !important;
-  padding: 0.65rem 0.85rem !important;
+  padding: 0.5rem 0.65rem !important;
+  margin-bottom: 0.35rem !important;
+}
+/* Quick access: caption under title — tight */
+.main [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCaption"] {
+  margin-top: -0.15rem !important;
+  margin-bottom: 0.35rem !important;
 }
 </style>
         """,
