@@ -1,8 +1,0 @@
----
-alwaysApply: true
----
-
-If you break any rule:
-- stop immediately
-- explain the violation
-- correct yourself
