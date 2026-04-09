@@ -52,11 +52,9 @@ id_ed25519
 .coverage
 htmlcov/
 
-# IDE — version shared Cursor rules; ignore the rest of .cursor
+# IDE — ignore full .cursor content
 .cursor/*
 !.cursor/
-!.cursor/rules/
-!.cursor/rules/**
 .idea/
 .vscode/
 *.swp
@@ -68,6 +66,7 @@ Desktop.ini
 
 # Local contributor roadmap (not for version control)
 FEATURE_ROADMAP_LOCAL.md
+DEFERRED-IMPROVEMENTS.md
 config/saved_views.yaml
 config/onboarding_state.yaml
 config/login_rate_limit_state.yaml
