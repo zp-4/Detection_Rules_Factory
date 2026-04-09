@@ -2,8 +2,29 @@ import openai
 import json
 from typing import Dict, Any, Optional, List
 
+
+def _ensure_ai_not_disabled(team: Optional[str] = None) -> None:
+    try:
+        from services.feature_flags import ai_disabled_for_team
+
+        if ai_disabled_for_team(team):
+            raise RuntimeError(
+                "AI features are disabled by an administrator (config/feature_flags.yaml)."
+            )
+    except ImportError:
+        pass
+
+
 class AIEngine:
-    def __init__(self, api_key: str, provider: str = "openai", base_url: Optional[str] = None, model_name: Optional[str] = None):
+    def __init__(
+        self,
+        api_key: str,
+        provider: str = "openai",
+        base_url: Optional[str] = None,
+        model_name: Optional[str] = None,
+        *,
+        team: Optional[str] = None,
+    ):
         """
         Initialize AI Engine with OpenAI, Gemini, or custom LLM (Llama, etc.).
         
@@ -18,6 +39,7 @@ class AIEngine:
                         - LM Studio: "http://localhost:1234/v1"
             model_name: Custom model name (optional, defaults based on provider)
         """
+        _ensure_ai_not_disabled(team)
         self.provider = provider.lower()
         self.model_name = model_name
         self.base_url = base_url
@@ -710,4 +732,148 @@ IMPORTANT: Respond with valid JSON only. No markdown, no explanations, just the 
                 "summary": f"Error analyzing CTI: {str(e)}",
                 "error": str(e),
                 "not_applicable": True,
+            }
+
+    def draft_rule_from_natural_language(
+        self,
+        description: str,
+        preferred_platform: str = "Windows",
+        preferred_format: str = "sigma",
+    ) -> Dict[str, Any]:
+        """
+        Turn a short natural-language intent into a detection rule skeleton,
+        suggested MITRE IDs, and a false-positive checklist. Returns a JSON-shaped dict.
+        """
+        prompt = f"""You are a senior detection engineer. The user describes what they want to detect (behavior, scenario, or threat).
+
+User intent (natural language):
+{description}
+
+Target platform (hint): {preferred_platform}
+Preferred rule format: {preferred_format}  (sigma, splunk, kql, or other)
+
+TASK:
+1. If the request is not about security detection (jokes, empty text, unrelated), respond with JSON only:
+{{"not_applicable": true, "summary": "Brief English reason why you cannot produce a rule draft."}}
+
+2. Otherwise produce ONE draft detection rule focused on behavioral / correlated logic (not bare IOCs). Respond with JSON ONLY:
+{{
+  "not_applicable": false,
+  "rule_name": "Short descriptive name",
+  "rule_text": "Full body in the requested format. For sigma: valid YAML with title, id, logsource, detection, level, tags including attack.tXXXX references where relevant.",
+  "platform": "{preferred_platform}",
+  "rule_format": "{preferred_format}",
+  "mitre_technique_id": "T1059.001 or null",
+  "mitre_technique_ids": ["T1059.001"],
+  "fp_checklist": [
+    "Bullet 1: known benign scenario to watch",
+    "Bullet 2: tuning or exclusion idea",
+    "Bullet 3: data quality / visibility caveat"
+  ],
+  "mitre_rationale": "One or two sentences linking behavior to suggested MITRE techniques.",
+  "summary": "One-sentence overview of the draft for the analyst."
+}}
+
+Rules:
+- Prefer Sigma YAML when format is sigma; otherwise provide a clear skeleton in the requested format.
+- Include at least 3 distinct fp_checklist items.
+- mitre_technique_ids should list primary techniques only (IDs like T1059, T1059.001).
+"""
+
+        def _strip_code_fence(content: str) -> str:
+            content = content.strip()
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.startswith("```"):
+                content = content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
+            return content.strip()
+
+        try:
+            if self.provider == "openai":
+                try:
+                    response = self.client.chat.completions.create(
+                        model=self.model_name,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "You are a detection engineer. Respond with JSON only. If the user request is not about detection, use not_applicable true.",
+                            },
+                            {"role": "user", "content": prompt},
+                        ],
+                        temperature=0.25,
+                        response_format={"type": "json_object"},
+                    )
+                    content = response.choices[0].message.content.strip()
+                    return json.loads(content)
+                except Exception:
+                    response = self.client.chat.completions.create(
+                        model=self.model_name,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "You are a detection engineer. Respond with JSON only.",
+                            },
+                            {"role": "user", "content": prompt},
+                        ],
+                        temperature=0.25,
+                    )
+                    content = _strip_code_fence(response.choices[0].message.content)
+                    return json.loads(content)
+
+            if self.provider == "gemini":
+                full_prompt = (
+                    "You are a detection engineer. Respond with valid JSON only.\n\n" + prompt
+                )
+                response = self.client.generate_content(full_prompt)
+                content = _strip_code_fence(response.text)
+                return json.loads(content)
+
+            if self.provider == "llama":
+                full_prompt = (
+                    "You are a detection engineer. Respond with valid JSON only, no markdown.\n\n"
+                    + prompt
+                )
+                try:
+                    response = self.client.chat.completions.create(
+                        model=self.model_name,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "Respond with JSON only.",
+                            },
+                            {"role": "user", "content": full_prompt},
+                        ],
+                        temperature=0.25,
+                        response_format={"type": "json_object"},
+                    )
+                except Exception:
+                    response = self.client.chat.completions.create(
+                        model=self.model_name,
+                        messages=[
+                            {"role": "system", "content": "Respond with JSON only."},
+                            {"role": "user", "content": full_prompt},
+                        ],
+                        temperature=0.25,
+                    )
+                content = _strip_code_fence(response.choices[0].message.content)
+                return json.loads(content)
+
+            return {
+                "not_applicable": True,
+                "summary": "Unsupported AI provider.",
+                "error": "unsupported_provider",
+            }
+        except json.JSONDecodeError as e:
+            return {
+                "not_applicable": True,
+                "summary": f"Invalid JSON from model: {e}",
+                "error": "json_decode",
+            }
+        except Exception as e:
+            return {
+                "not_applicable": True,
+                "summary": str(e),
+                "error": str(e),
             }

@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 from db.models import (
     UseCase, RuleImplementation, OfflineAuditResult,
     AiAuditResult, CoverageSnapshot, DecisionLog,
-    Comment, QuotaUsage, AiLock, RuleChangeLog
+    Comment, QuotaUsage, AiLock, RuleChangeLog, CtiLibraryEntry,
+    UserNotification, ConfigAuditLog,
 )
 
 
@@ -91,6 +92,48 @@ class UseCaseRepository:
 
 
 # ========== RuleImplementation Repository ==========
+
+class CtiLibraryRepository:
+    """CRUD for reusable CTI library entries."""
+
+    @staticmethod
+    def create(db: Session, **kwargs) -> CtiLibraryEntry:
+        row = CtiLibraryEntry(**kwargs)
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return row
+
+    @staticmethod
+    def get_by_id(db: Session, entry_id: int) -> Optional[CtiLibraryEntry]:
+        return db.query(CtiLibraryEntry).filter(CtiLibraryEntry.id == entry_id).first()
+
+    @staticmethod
+    def list_all(db: Session, limit: int = 500) -> List[CtiLibraryEntry]:
+        return db.query(CtiLibraryEntry).order_by(desc(CtiLibraryEntry.updated_at)).limit(limit).all()
+
+    @staticmethod
+    def update(db: Session, entry_id: int, **kwargs) -> Optional[CtiLibraryEntry]:
+        row = CtiLibraryRepository.get_by_id(db, entry_id)
+        if not row:
+            return None
+        for key, value in kwargs.items():
+            if hasattr(row, key):
+                setattr(row, key, value)
+        row.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(row)
+        return row
+
+    @staticmethod
+    def delete(db: Session, entry_id: int) -> bool:
+        row = CtiLibraryRepository.get_by_id(db, entry_id)
+        if not row:
+            return False
+        db.delete(row)
+        db.commit()
+        return True
+
 
 class RuleRepository:
     """Repository for RuleImplementation operations."""
@@ -257,6 +300,87 @@ class CommentRepository:
         ).order_by(Comment.created_at).all()
 
 
+class NotificationRepository:
+    """In-app notifications (mentions, etc.)."""
+
+    @staticmethod
+    def create(
+        db: Session,
+        *,
+        username: str,
+        message: str,
+        entity_type: Optional[str] = None,
+        entity_id: Optional[int] = None,
+        comment_id: Optional[int] = None,
+    ) -> UserNotification:
+        row = UserNotification(
+            username=username,
+            message=message,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            comment_id=comment_id,
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return row
+
+    @staticmethod
+    def list_for_user(
+        db: Session,
+        username: str,
+        limit: int = 100,
+        unread_only: bool = False,
+    ) -> List[UserNotification]:
+        q = db.query(UserNotification).filter(UserNotification.username == username)
+        if unread_only:
+            q = q.filter(UserNotification.read_at.is_(None))
+        return q.order_by(desc(UserNotification.created_at)).limit(limit).all()
+
+    @staticmethod
+    def count_unread(db: Session, username: str) -> int:
+        return (
+            db.query(UserNotification)
+            .filter(
+                UserNotification.username == username,
+                UserNotification.read_at.is_(None),
+            )
+            .count()
+        )
+
+    @staticmethod
+    def mark_read(db: Session, notification_id: int, username: str) -> bool:
+        row = (
+            db.query(UserNotification)
+            .filter(
+                UserNotification.id == notification_id,
+                UserNotification.username == username,
+            )
+            .first()
+        )
+        if not row:
+            return False
+        row.read_at = datetime.utcnow()
+        db.commit()
+        return True
+
+    @staticmethod
+    def mark_all_read(db: Session, username: str) -> int:
+        rows = (
+            db.query(UserNotification)
+            .filter(
+                UserNotification.username == username,
+                UserNotification.read_at.is_(None),
+            )
+            .all()
+        )
+        now = datetime.utcnow()
+        for r in rows:
+            r.read_at = now
+        db.commit()
+        return len(rows)
+
+
 class QuotaRepository:
     """Repository for QuotaUsage operations."""
     
@@ -330,6 +454,12 @@ class RuleChangeLogRepository:
             "last_mapping_analysis": rule.last_mapping_analysis,
             "enabled": rule.enabled,
             "version": rule.version,
+            "ticket_refs": getattr(rule, "ticket_refs", None),
+            "operational_status": getattr(rule, "operational_status", None) or "production",
+            "playbook": getattr(rule, "playbook", None),
+            "cti_refs": getattr(rule, "cti_refs", None),
+            "archived_at": rule.archived_at.isoformat() if getattr(rule, "archived_at", None) else None,
+            "archived_by": getattr(rule, "archived_by", None),
             "created_at": rule.created_at.isoformat() if rule.created_at else None,
             "updated_at": rule.updated_at.isoformat() if rule.updated_at else None,
         }
@@ -367,15 +497,29 @@ class RuleChangeLogRepository:
     ) -> RuleChangeLog:
         """Log a rule update with field-level changes."""
         new_state = RuleChangeLogRepository._rule_to_dict(rule)
-        
+
         # Calculate changed fields
-        changed_fields = {}
+        changed_fields: Dict[str, Any] = {}
         for key in new_state:
             old_val = previous_state.get(key)
             new_val = new_state.get(key)
             if old_val != new_val:
                 changed_fields[key] = {"old": old_val, "new": new_val}
-        
+
+        # Bump business version when meaningful fields change (not cache-only)
+        meta_only = {"updated_at", "last_audit_results", "last_mapping_analysis"}
+        if any(k not in meta_only for k in changed_fields):
+            rule.version = (rule.version or 1) + 1
+            db.commit()
+            db.refresh(rule)
+            new_state = RuleChangeLogRepository._rule_to_dict(rule)
+            changed_fields = {}
+            for key in new_state:
+                old_val = previous_state.get(key)
+                new_val = new_state.get(key)
+                if old_val != new_val:
+                    changed_fields[key] = {"old": old_val, "new": new_val}
+
         log_entry = RuleChangeLog(
             rule_id=rule.id,
             changed_by=changed_by,
@@ -514,6 +658,12 @@ class RuleChangeLogRepository:
                 last_audit_results=prev.get("last_audit_results"),
                 last_mapping_analysis=prev.get("last_mapping_analysis"),
                 enabled=prev.get("enabled", True),
+                ticket_refs=prev.get("ticket_refs"),
+                operational_status=prev.get("operational_status") or "production",
+                playbook=prev.get("playbook"),
+                cti_refs=prev.get("cti_refs"),
+                archived_at=None,
+                archived_by=None,
                 version=(prev.get("version", 1) or 1) + 1
             )
             db.add(restored_rule)
@@ -565,6 +715,29 @@ class RuleChangeLogRepository:
             rule.last_audit_results = prev.get("last_audit_results")
             rule.last_mapping_analysis = prev.get("last_mapping_analysis")
             rule.enabled = prev.get("enabled", True)
+            if hasattr(rule, "ticket_refs"):
+                rule.ticket_refs = prev.get("ticket_refs")
+            if hasattr(rule, "operational_status"):
+                rule.operational_status = prev.get("operational_status") or "production"
+            if hasattr(rule, "playbook"):
+                rule.playbook = prev.get("playbook")
+            if hasattr(rule, "cti_refs"):
+                rule.cti_refs = prev.get("cti_refs")
+            if hasattr(rule, "archived_at"):
+                ar = prev.get("archived_at")
+                if ar is None:
+                    rule.archived_at = None
+                elif isinstance(ar, str):
+                    try:
+                        rule.archived_at = datetime.fromisoformat(
+                            ar.replace("Z", "+00:00")
+                        )
+                    except Exception:
+                        rule.archived_at = None
+                else:
+                    rule.archived_at = ar
+            if hasattr(rule, "archived_by"):
+                rule.archived_by = prev.get("archived_by")
             rule.version = (rule.version or 1) + 1
             rule.updated_at = datetime.utcnow()
             
@@ -589,4 +762,39 @@ class RuleChangeLogRepository:
             return rule
         
         return None
+
+
+# ========== Config audit (admin platform / quota / YAML saves) ==========
+
+
+class ConfigAuditRepository:
+    """Append-only audit trail for configuration changes."""
+
+    @staticmethod
+    def append(
+        db: Session,
+        actor_username: str,
+        category: str,
+        action: str,
+        detail: Optional[Dict[str, Any]] = None,
+    ) -> ConfigAuditLog:
+        row = ConfigAuditLog(
+            actor_username=actor_username,
+            category=category,
+            action=action,
+            detail=detail or {},
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return row
+
+    @staticmethod
+    def list_recent(db: Session, limit: int = 200) -> List[ConfigAuditLog]:
+        return (
+            db.query(ConfigAuditLog)
+            .order_by(desc(ConfigAuditLog.occurred_at))
+            .limit(limit)
+            .all()
+        )
 

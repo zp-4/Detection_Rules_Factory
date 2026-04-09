@@ -1,10 +1,10 @@
 """Time utilities."""
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def get_current_period() -> str:
     """Get current period in YYYY-MM format."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     return now.strftime("%Y-%m")
 
 

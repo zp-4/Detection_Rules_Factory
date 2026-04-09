@@ -1,5 +1,11 @@
 # RBAC Configuration
 # Simple user/role/team mapping
+#
+# Optional: require a password for an account (PBKDF2-SHA256). Generate hash:
+#   python scripts/hash_password.py
+# Then add under the user:
+#   password_hash: "pbkdf2_sha256$390000$...."
+# If password_hash is omitted, sign-in is username-only (demo mode).
 users:
   admin:
     role: admin

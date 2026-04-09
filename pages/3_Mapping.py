@@ -8,8 +8,10 @@ from db.models import RuleImplementation, MappingReview
 from src.ai_engine import AIEngine
 from src.mitre_engine import MitreEngine
 from sqlalchemy.orm.attributes import flag_modified
-from services.auth import get_current_user, login, has_permission
+from services.auth import get_current_user, has_permission, require_sign_in
+from utils.app_navigation import render_app_sidebar
 from db.repo import RuleChangeLogRepository
+from services.webhooks import emit_mapping_changed
 
 st.set_page_config(
     page_title="MITRE Mapping Analysis",
@@ -17,28 +19,9 @@ st.set_page_config(
     layout="wide"
 )
 
-# Authentication check
+require_sign_in("MITRE Mapping Analysis")
 username = get_current_user()
-if not username:
-    st.warning("Please login to access Mapping Analysis")
-    st.divider()
-    
-    # Login form
-    with st.form("login_form"):
-        st.subheader("Login")
-        login_username = st.text_input("Username", placeholder="Enter your username")
-        if st.form_submit_button("Login", type="primary"):
-            if login_username:
-                if login(login_username):
-                    st.success(f"Logged in as {login_username}")
-                    st.rerun()
-                else:
-                    st.error("Invalid username. Please check your credentials.")
-            else:
-                st.error("Please enter a username")
-    
-    st.info("💡 **Demo users:** admin, reviewer1, contributor1, reader1")
-    st.stop()
+render_app_sidebar(username)
 
 st.title("🎯 MITRE Mapping Analysis")
 st.markdown("""
@@ -255,19 +238,22 @@ try:
                         api_key=llama_api_key or "",
                         provider="llama",
                         base_url=llama_base_url,
-                        model_name=llama_model_name or "llama3"
+                        model_name=llama_model_name or "llama3",
+                        team=st.session_state.get("user_team"),
                     )
                 elif ai_provider == "OpenAI":
                     ai_engine = AIEngine(
                         openai_api_key,
                         provider="openai",
                         model_name=openai_model_name,
+                        team=st.session_state.get("user_team"),
                     )
                 else:
                     ai_engine = AIEngine(
                         gemini_api_key,
                         provider="gemini",
                         model_name=gemini_model_name,
+                        team=st.session_state.get("user_team"),
                     )
                 
                 # Analyze button
@@ -528,7 +514,9 @@ try:
                                         )
                                         db.add(review)
                                         db.commit()
-                                        
+                                        db.refresh(review)
+                                        emit_mapping_changed(review, rule)
+
                                         # Log to audit trail
                                         RuleChangeLogRepository.log_update(
                                             db, rule, previous_state, current_user,
@@ -588,7 +576,9 @@ try:
                                         )
                                         db.add(review)
                                         db.commit()
-                                        
+                                        db.refresh(review)
+                                        emit_mapping_changed(review, rule)
+
                                         # Log to audit trail
                                         RuleChangeLogRepository.log_update(
                                             db, rule, previous_state, current_user,
@@ -643,7 +633,9 @@ try:
                                         )
                                         db.add(review)
                                         db.commit()
-                                        
+                                        db.refresh(review)
+                                        emit_mapping_changed(review, rule)
+
                                         # Log to audit trail
                                         RuleChangeLogRepository.log_update(
                                             db, rule, previous_state, current_user,
@@ -735,8 +727,3 @@ try:
 
 finally:
     db.close()
-
-# Add admin link at bottom of sidebar
-st.sidebar.divider()
-if st.sidebar.button("⚙️ Admin", width='stretch'):
-    st.switch_page("pages/8_Admin.py")

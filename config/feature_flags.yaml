@@ -1,0 +1,4 @@
+# Platform switches (editable from Admin → Platform)
+maintenance_message: ""
+disable_ai_globally: false
+disable_ai_teams: []

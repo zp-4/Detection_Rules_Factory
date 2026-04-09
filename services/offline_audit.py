@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from src.mitre_engine import MitreEngine
 from db.repo import OfflineAuditRepository
 from db.models import RuleImplementation
+from services.webhooks import emit_audit_completed
 
 
 def run_offline_audit(
@@ -69,7 +70,8 @@ def run_offline_audit(
         overlap_json=overlap_json,
         confidence=confidence
     )
-    
+    emit_audit_completed(rule.id, rule.rule_name, result.id, confidence, kind="offline")
+
     return {
         "id": result.id,
         "coverage_json": coverage_json,

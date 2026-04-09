@@ -1,21 +1,31 @@
-"""Main landing page / router for Detection Rules Factory."""
+"""Main landing page — tableau de bord utilisateur (la navigation reste dans la sidebar)."""
 # -*- coding: utf-8 -*-
 import sys
 import os
-# Set UTF-8 encoding for Windows compatibility
 if sys.platform == 'win32':
     os.environ['PYTHONIOENCODING'] = 'utf-8'
-    # Ensure UTF-8 encoding is used
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')
     if hasattr(sys.stderr, 'reconfigure'):
         sys.stderr.reconfigure(encoding='utf-8')
 
-import streamlit as st
-from services.auth import get_current_user, login, logout
-from utils.session_persistence import restore_session_state, persist_session_state
+import html
 
-# Restore session state on page load
+import pandas as pd
+import streamlit as st
+
+from services.auth import ROLES, get_current_user, has_permission
+from services.feature_flags import maintenance_message
+from services.onboarding import compute_progress, mark_step
+from services.security_posture import security_findings
+from utils.mitre_links import technique_links_markdown
+from utils.session_persistence import restore_session_state
+from utils.dashboard_home import load_home_dashboard_stats
+from utils.app_navigation import (
+    count_unread_notifications,
+    render_app_sidebar,
+)
+
 restore_session_state()
 
 st.set_page_config(
@@ -25,104 +35,177 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Sidebar login
-st.sidebar.title("🏭 Detection Rules Factory")
-
 username = get_current_user()
-
 if not username:
-    st.sidebar.subheader("Login")
-    login_username = st.sidebar.text_input("Username")
-    if st.sidebar.button("Login"):
-        if login(login_username):
-            st.sidebar.success(f"Logged in as {login_username}")
-            st.rerun()
-        else:
-            st.sidebar.error("Invalid username")
-else:
-    st.sidebar.success(f"Logged in as: **{username}**")
-    st.sidebar.caption(f"Role: {st.session_state.get('user_role', 'N/A')}")
-    st.sidebar.caption(f"Team: {st.session_state.get('user_team', 'N/A')}")
-    
-    if st.sidebar.button("Logout"):
-        logout()
+    st.switch_page("pages/0_Login.py")
+
+_n_unread = count_unread_notifications(username)
+render_app_sidebar(username, _n_unread)
+
+_banner = maintenance_message()
+if _banner:
+    st.warning(_banner)
+for finding in security_findings():
+    st.warning(f"Security posture: {finding}")
+
+stats = load_home_dashboard_stats(username)
+_has_import = stats.n_rules > 0
+_has_audit = stats.n_audits_total > 0
+_onb = compute_progress(username=username, has_import=_has_import, has_audit=_has_audit)
+if _onb.completed < _onb.total:
+    st.info(
+        f"Onboarding in progress: {_onb.completed}/{_onb.total}. "
+        "Complete steps in usr > Onboarding."
+    )
+elif "onboarding_banner_dismissed" not in st.session_state:
+    st.success("Onboarding complete. Your workspace is ready.")
+    if st.button("Hide this message", key="hide_onboarding_done"):
+        st.session_state["onboarding_banner_dismissed"] = True
+        mark_step(username, "dashboard_seen", True)
         st.rerun()
 
-# Main content
-st.title("🏭 Detection Rules Factory")
-st.markdown("""
-**A comprehensive platform for managing SOC detection rules and MITRE ATT&CK coverage analysis.**
+role = st.session_state.get("user_role", "—")
+team = st.session_state.get("user_team", "—")
+_safe = html.escape
+_u, _r, _t = _safe(str(username)), _safe(str(role)), _safe(str(team))
 
-### Features:
-- 📋 **Rules Catalogue**: Manage and filter detection rules with tags
-- 🛡️ **MITRE Audit**: Gap analysis against MITRE ATT&CK framework
-- 🎯 **MITRE Mapping Analysis**: AI-powered mapping verification and improvement
-- 📊 **Coverage Dashboard**: Visualize MITRE coverage across your detection rules
-- 🎯 **Group Coverage**: Analyze coverage of APT groups' techniques
-- 🔍 **CTI Detection Opportunity**: Extract detection rules from threat intelligence
-- ⚙️ **Administration**: Manage quotas and access control
+st.markdown(
+    f"""
+<div class="drf-topbar">
+  <div class="drf-topbar-left">
+    <span class="drf-topbar-kicker">User dashboard</span>
+    <h1 class="drf-topbar-title">Detection Rules Factory</h1>
+  </div>
+  <p class="drf-topbar-right">
+    {_u} · {_r} · {_t}
+  </p>
+</div>
+    """,
+    unsafe_allow_html=True,
+)
+role_permissions = [str(p) for p in ROLES.get(str(role), [])]
+safe_badges = "".join(
+    f'<span class="drf-badge">{html.escape(p)}</span>' for p in role_permissions
+) or '<span class="drf-badge">read</span>'
+st.markdown(
+    f'<div class="drf-badge-row"><span class="drf-badge-title">Permissions:</span>{safe_badges}</div>',
+    unsafe_allow_html=True,
+)
 
-### Navigation:
-Use the sidebar to navigate between pages, or select from the pages below.
-""")
+if stats.error and not stats.db_ok:
+    st.error(f"Base de données indisponible : {stats.error}")
 
-# Quick links
-col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
+st.markdown("### Snapshot")
+st.markdown(
+    f"""
+<div class="drf-kpi-grid">
+  <div class="drf-kpi-card"><span>Cas d’usage</span><strong>{stats.n_use_cases}</strong></div>
+  <div class="drf-kpi-card"><span>Règles</span><strong>{stats.n_rules}</strong></div>
+  <div class="drf-kpi-card"><span>En revue</span><strong>{stats.n_use_cases_in_review}</strong></div>
+  <div class="drf-kpi-card"><span>Entrées CTI</span><strong>{stats.n_cti_entries}</strong></div>
+  <div class="drf-kpi-card"><span>Notifications</span><strong>{stats.n_unread_notifications}</strong></div>
+  <div class="drf-kpi-card"><span>Reevaluation {stats.quarterly_label}</span><strong>{stats.n_quarterly_reeval_queue}</strong></div>
+</div>
+    """,
+    unsafe_allow_html=True,
+)
 
-with col1:
-    if st.button("📋 Rules", width='stretch'):
-        st.switch_page("pages/1_Use_Cases.py")
+col_left, col_right = st.columns([1.45, 1], gap="large")
 
-with col2:
-    if st.button("🛡️ Audit", width='stretch'):
-        st.switch_page("pages/2_Audit.py")
+with col_left:
+    st.markdown("### Activity")
+    with st.container(border=True):
+        st.markdown('<div class="drf-priority-list">', unsafe_allow_html=True)
+        if stats.n_my_reviews > 5 and has_permission("update"):
+            st.markdown(
+                f'<div class="drf-priority-item drf-priority-crit">Review queue: <strong>{stats.n_my_reviews}</strong> assigned</div>',
+                unsafe_allow_html=True,
+            )
+        elif stats.n_my_reviews > 0 and has_permission("update"):
+            st.markdown(
+                f'<div class="drf-priority-item drf-priority-warn">Review queue: <strong>{stats.n_my_reviews}</strong> assigned</div>',
+                unsafe_allow_html=True,
+            )
+        elif has_permission("update"):
+            st.markdown(
+                '<div class="drf-priority-item drf-priority-ok">Review queue: clear</div>',
+                unsafe_allow_html=True,
+            )
 
-with col3:
-    if st.button("🎯 Mapping", width='stretch'):
-        st.switch_page("pages/3_Mapping.py")
+        if stats.n_unread_notifications > 10:
+            st.markdown(
+                f'<div class="drf-priority-item drf-priority-crit">Unread notifications: <strong>{stats.n_unread_notifications}</strong></div>',
+                unsafe_allow_html=True,
+            )
+        elif stats.n_unread_notifications > 0:
+            st.markdown(
+                f'<div class="drf-priority-item drf-priority-info">Unread notifications: <strong>{stats.n_unread_notifications}</strong></div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div class="drf-priority-item drf-priority-ok">Unread notifications: 0</div>',
+                unsafe_allow_html=True,
+            )
 
-with col4:
-    if st.button("📊 Dashboard", width='stretch'):
-        st.switch_page("pages/4_Dashboard_MITRE.py")
+        if has_permission("trigger_ai"):
+            st.markdown(
+                '<div class="drf-priority-item drf-priority-info">AI drafting enabled</div>',
+                unsafe_allow_html=True,
+            )
+        if stats.n_quarterly_reeval_queue > 25:
+            st.markdown(
+                f'<div class="drf-priority-item drf-priority-crit">Quarterly reevaluation queue: <strong>{stats.n_quarterly_reeval_queue}</strong></div>',
+                unsafe_allow_html=True,
+            )
+        elif stats.n_quarterly_reeval_queue > 0:
+            st.markdown(
+                f'<div class="drf-priority-item drf-priority-warn">Quarterly reevaluation queue: <strong>{stats.n_quarterly_reeval_queue}</strong></div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div class="drf-priority-item drf-priority-ok">Quarterly reevaluation queue: 0</div>',
+                unsafe_allow_html=True,
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
 
-with col5:
-    if st.button("🎯 Groups", width='stretch'):
-        st.switch_page("pages/5_Group_Coverage.py")
-
-with col6:
-    if st.button("🔍 CTI", width='stretch'):
-        st.switch_page("pages/6_CTI_Detection.py")
-
-with col7:
-    if st.button("⚙️ Admin", width='stretch'):
-        st.switch_page("pages/8_Admin.py")
-
-st.divider()
-
-# Status
-st.subheader("System Status")
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    try:
-        from db.session import engine
-        from sqlalchemy import inspect
-        inspector = inspect(engine)
-        tables = inspector.get_table_names()
-        st.success(f"✅ Database: {len(tables)} tables")
-    except:
-        st.error("❌ Database: Not initialized")
-
-with col2:
-    try:
-        from services.mitre_coverage import get_mitre_engine
-        get_mitre_engine()
-        st.success("✅ MITRE Engine: Ready")
-    except:
-        st.warning("⚠️ MITRE Engine: Not loaded")
-
-with col3:
-    if username:
-        st.success(f"✅ User: {username}")
+    st.markdown("### Use case distribution")
+    if stats.use_cases_by_status:
+        df = pd.DataFrame(
+            [
+                {"Statut": k, "Nombre": v}
+                for k, v in sorted(stats.use_cases_by_status.items())
+            ]
+        )
+        st.bar_chart(df.set_index("Statut"), height=280)
     else:
-        st.info("ℹ️ User: Not logged in")
+        st.info("No use-case data.")
+
+with col_right:
+    st.markdown("### Platform")
+    with st.container(border=True):
+        st.caption("DATABASE")
+        if stats.db_ok:
+            st.success("Connected")
+        else:
+            st.error("Unavailable")
+    with st.container(border=True):
+        st.caption("MITRE ENGINE")
+        if stats.mitre_engine_ok:
+            st.success("Loaded")
+        else:
+            st.warning("Not loaded")
+    st.markdown("### Explainability")
+    with st.container(border=True):
+        if stats.explainability_items:
+            for it in stats.explainability_items:
+                rule_name = html.escape(str(it.get("rule_name", "Rule")))
+                sentence = html.escape(str(it.get("summary_sentence", "")))
+                tids = it.get("technique_ids", [])
+                st.markdown(
+                    f"**{rule_name}** (`#{int(it.get('rule_id', 0))}`)  \n{sentence}"
+                )
+                st.caption(f"MITRE: {technique_links_markdown(tids)}")
+        else:
+            st.caption("No explainability snippets available yet.")

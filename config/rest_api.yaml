@@ -1,0 +1,8 @@
+# Optional read-only REST API (run: uvicorn rest_api:app --host 0.0.0.0 --port 8080)
+# Authenticate with header: Authorization: Bearer <token>
+enabled: false
+tokens: []
+# Example:
+# tokens:
+#   - name: soc-dashboard
+#     token: "generate-a-long-random-string"

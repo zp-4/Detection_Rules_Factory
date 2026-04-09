@@ -1,0 +1,5 @@
+# Login brute-force controls (username-based).
+enabled: true
+max_failures: 5
+window_seconds: 900
+lockout_seconds: 900

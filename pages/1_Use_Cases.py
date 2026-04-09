@@ -1,14 +1,22 @@
 """Rules catalogue page."""
+import json
 import streamlit as st
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from datetime import datetime
 from db.session import SessionLocal
-from db.repo import RuleRepository, RuleChangeLogRepository
+from db.repo import RuleRepository, RuleChangeLogRepository, CtiLibraryRepository, CommentRepository
 from db.models import RuleImplementation
-from services.auth import get_current_user, has_permission, login
+from services.auth import get_current_user, has_permission, require_sign_in
+from services.ticket_refs import parse_ticket_refs_json, ticket_refs_to_display_lines
+from services.rule_playbook import normalize_playbook, playbook_from_form
+from services.cti_refs import build_cti_refs_from_entry_ids, normalize_cti_refs
+from services.business_tags import load_business_tags, validate_rule_tags
+from services.comment_notifications import add_comment_with_notifications
+from services.webhooks import emit_mapping_changed
 from utils.hashing import compute_rule_hash
 from utils.session_persistence import restore_session_state, persist_session_state
+from utils.app_navigation import render_app_sidebar
 
 # Restore session state
 restore_session_state()
@@ -18,32 +26,17 @@ st.set_page_config(page_title="Detection Rules", page_icon="📋", layout="wide"
 st.title("📋 Detection Rules")
 st.markdown("Manage and filter your detection rules. Select rules to run MITRE ATT&CK audits.")
 
-# Get current user
+require_sign_in("the Detection Rules catalogue")
 username = get_current_user()
-if not username:
-    st.warning("Please login to access Rules")
-    st.divider()
-    
-    # Login form
-    with st.form("login_form"):
-        st.subheader("Login")
-        login_username = st.text_input("Username", placeholder="Enter your username")
-        if st.form_submit_button("Login", type="primary"):
-            if login_username:
-                if login(login_username):
-                    st.success(f"Logged in as {login_username}")
-                    st.rerun()
-                else:
-                    st.error("Invalid username. Please check your credentials.")
-            else:
-                st.error("Please enter a username")
-    
-    st.info("💡 **Demo users:** admin, reviewer1, contributor1, reader1")
-    st.stop()
+render_app_sidebar(username)
 
 # Database session
 db = SessionLocal()
 try:
+    _cti_entries = CtiLibraryRepository.list_all(db, limit=400)
+    _cti_labels = {f"{e.id} — {e.title}": e.id for e in _cti_entries}
+    _bt_cfg = load_business_tags()
+    _allowed_tags = [str(x).strip() for x in (_bt_cfg.get("allowed_tags") or []) if str(x).strip()]
     # Function to check and tag rules that haven't been audited in 3 months
     def check_and_tag_stale_rules(db_session):
         """Check rules and add 'to_improve' tag if not audited in 3 months."""
@@ -52,7 +45,11 @@ try:
         three_months_ago = datetime.now() - timedelta(days=90)
         updated_count = 0
         
-        all_rules_to_check = db_session.query(RuleImplementation).all()
+        all_rules_to_check = (
+            db_session.query(RuleImplementation)
+            .filter(RuleImplementation.archived_at.is_(None))
+            .all()
+        )
         
         for rule in all_rules_to_check:
             needs_tag = False
@@ -122,8 +119,17 @@ try:
                 st.info(f"📅 {updated} rule(s) tagged with 'to_improve' (not audited in 3+ months)")
             st.session_state['stale_rules_checked'] = True
     
-    # Get all rules to extract unique tags
-    all_rules = db.query(RuleImplementation).all()
+    show_archived_cat = st.sidebar.checkbox(
+        "Show archived rules",
+        value=False,
+        key="cat_show_archived",
+        help="Archived rules are hidden by default (Governance).",
+    )
+    _all_q = db.query(RuleImplementation)
+    if not show_archived_cat:
+        _all_q = _all_q.filter(RuleImplementation.archived_at.is_(None))
+    # Get all rules to extract unique tags (respect archived toggle)
+    all_rules = _all_q.all()
     all_tags = set()
     for rule in all_rules:
         # Extract tags from JSON field, handling different formats
@@ -163,6 +169,7 @@ try:
             help="Quick filter presets"
         )
     
+    operational_status_filter: list = []
     # Advanced filters in expander
     with st.expander("🔧 Advanced Filters", expanded=False):
         col1, col2, col3, col4 = st.columns(4)
@@ -199,12 +206,41 @@ try:
         with col4:
             mitre_filter = st.text_input("MITRE Technique", placeholder="e.g., T1059.003", help="Filter by MITRE technique ID")
 
+        op_opts = ["production", "staging", "test", "pilot", "paused", "retired"]
+        operational_status_filter = st.multiselect(
+            "Operational status",
+            options=op_opts,
+            help="Rule lifecycle environment (catalogue field)",
+        )
+
+        tactic_options: list = []
+        try:
+            from services.mitre_coverage import get_mitre_engine
+            from services.mitre_catalog import list_tactic_shortnames
+
+            _me = get_mitre_engine()
+            tactic_options = list_tactic_shortnames(_me.mitre_attack_data)
+        except Exception:
+            pass
+        tactic_filter = st.multiselect(
+            "MITRE tactic(s)",
+            options=tactic_options,
+            help="Filter rules whose mapped techniques fall under these tactics (kill-chain phases).",
+        )
+        include_subtechniques = st.checkbox(
+            "Include sub-techniques in tactic filter",
+            value=True,
+            help="If unchecked, only parent techniques (no Txxxx.yyy) are considered for the tactic filter.",
+        )
+
     # Filter for enabled rules by default (unless user wants to see disabled)
     show_disabled = st.sidebar.checkbox("Show Disabled Rules", value=False, help="Show rules that have been disabled")
     
     # Get all rules
     rules_query = db.query(RuleImplementation)
-    
+    if not show_archived_cat:
+        rules_query = rules_query.filter(RuleImplementation.archived_at.is_(None))
+
     # Filter by enabled status (only if column exists)
     try:
         if not show_disabled:
@@ -251,6 +287,26 @@ try:
     tag_filter_applied = False
     if tag_filter:
         tag_filter_applied = True
+
+    tactic_filter_applied = bool(tactic_filter)
+    tactic_allowed_set = set()
+    if tactic_filter_applied:
+        try:
+            from services.mitre_coverage import get_mitre_engine
+            from services.mitre_catalog import (
+                compute_allowed_technique_ids,
+                rule_matches_allowed_techniques,
+            )
+
+            _me2 = get_mitre_engine()
+            tactic_allowed_set = compute_allowed_technique_ids(
+                _me2.mitre_attack_data,
+                set(tactic_filter),
+                include_subtechniques,
+            )
+        except Exception as _e:
+            tactic_filter_applied = False
+            st.warning(f"MITRE tactic filter unavailable: {_e}")
     
     # Apply format filter
     if format_filter:
@@ -259,40 +315,52 @@ try:
     # Apply MITRE filter
     if mitre_filter:
         rules_query = rules_query.filter(RuleImplementation.mitre_technique_id.ilike(f"%{mitre_filter}%"))
+
+    if operational_status_filter:
+        try:
+            rules_query = rules_query.filter(
+                RuleImplementation.operational_status.in_(operational_status_filter)
+            )
+        except Exception:
+            pass
     
-    # Get all rules first (before pagination) if we need to filter by tags in Python
-    if tag_filter_applied and tag_filter:
-        # Get all rules to filter by tags (without pagination first)
+    post_python_filter = (tag_filter_applied and tag_filter) or tactic_filter_applied
+
+    # Get all rules first (before pagination) if we need Python-side filters
+    if post_python_filter:
+        from services.mitre_catalog import rule_matches_allowed_techniques
+
         all_rules_for_tag_filter = rules_query.order_by(RuleImplementation.created_at.desc()).all()
-        # Filter by tags in Python
         filtered_rules = []
         for rule in all_rules_for_tag_filter:
-            rule_tags = rule.tags if rule.tags else []
-            # Handle different formats: list, string, or None
-            if rule_tags is None:
-                rule_tags = []
-            elif isinstance(rule_tags, str):
-                # If it's a string, try to parse it as JSON
-                try:
-                    import json
-                    rule_tags = json.loads(rule_tags)
-                except:
-                    rule_tags = [rule_tags]
-            elif not isinstance(rule_tags, list):
-                rule_tags = []
-            
-            # Also check platform and rule_format as potential tags
-            all_rule_tags = list(rule_tags)
-            if rule.platform:
-                all_rule_tags.append(rule.platform)
-            if rule.rule_format:
-                all_rule_tags.append(rule.rule_format)
-            
-            # Check if any of the filter tags are in the rule's tags (including platform/format)
-            if any(tag in all_rule_tags for tag in tag_filter):
-                filtered_rules.append(rule)
-        
-        # Apply pagination after filtering
+            if tag_filter_applied and tag_filter:
+                rule_tags = rule.tags if rule.tags else []
+                if rule_tags is None:
+                    rule_tags = []
+                elif isinstance(rule_tags, str):
+                    try:
+                        import json
+                        rule_tags = json.loads(rule_tags)
+                    except Exception:
+                        rule_tags = [rule_tags]
+                elif not isinstance(rule_tags, list):
+                    rule_tags = []
+
+                all_rule_tags = list(rule_tags)
+                if rule.platform:
+                    all_rule_tags.append(rule.platform)
+                if rule.rule_format:
+                    all_rule_tags.append(rule.rule_format)
+
+                if not any(tag in all_rule_tags for tag in tag_filter):
+                    continue
+
+            if tactic_filter_applied:
+                if not rule_matches_allowed_techniques(rule, tactic_allowed_set):
+                    continue
+
+            filtered_rules.append(rule)
+
         page_size = 20
         page_num = st.session_state.get("rules_page", 1)
         total_rules = len(filtered_rules)
@@ -370,7 +438,37 @@ try:
                 with col2:
                     mitre_technique = st.text_input("MITRE Technique ID", placeholder="e.g., T1059.001")
                     tags_input = st.text_input("Tags (comma-separated)", placeholder="e.g., endpoint, execution, powershell")
-                    tags_list = [t.strip() for t in tags_input.split(",")] if tags_input else []
+                    if _allowed_tags:
+                        st.multiselect(
+                            "Governed tags (merged with field above)",
+                            options=_allowed_tags,
+                            key="cr_gov_tags",
+                        )
+                    _OPS_C = ["production", "staging", "test", "pilot", "paused", "retired"]
+                    operational_status_c = st.selectbox("Operational status", _OPS_C, index=0)
+                    ticket_refs_raw_c = st.text_area(
+                        "External tickets (JSON)",
+                        value="[]",
+                        height=80,
+                        help='[{"system":"jira","key":"SEC-1","url":"https://..."}]',
+                    )
+                    with st.expander("📘 Detection playbook (optional)", expanded=False):
+                        _pbc = normalize_playbook(None)
+                        pb_fp_c = st.text_area("False positive handling", value=_pbc["false_positive"], key="cr_pb_fp")
+                        pb_val_c = st.text_area("Validation steps", value=_pbc["validation"], key="cr_pb_val")
+                        pb_esc_c = st.text_area("Escalation", value=_pbc["escalation"], key="cr_pb_esc")
+                        pb_ct_c = st.text_area(
+                            "Contacts (JSON)",
+                            value="[]",
+                            key="cr_pb_ct",
+                            help='[{"name":"","role":"","channel":""}]',
+                        )
+                    if _cti_labels:
+                        st.multiselect(
+                            "CTI library sources (optional)",
+                            options=list(_cti_labels.keys()),
+                            key="cr_cti",
+                        )
                 
                 col_submit, col_cancel = st.columns(2)
                 with col_submit:
@@ -386,51 +484,78 @@ try:
                     if not rule_name or not rule_text or not platform:
                         st.error("Rule name, query, and platform are required")
                     else:
-                        try:
-                            # Compute hash with all parameters
-                            rule_hash = compute_rule_hash(rule_text, platform, rule_format)
-                            
-                            # Create a default use case if needed
-                            from db.repo import UseCaseRepository
-                            default_ucs = UseCaseRepository.list_all(db, limit=1)
-                            use_case_id = default_ucs[0].id if default_ucs else None
-                            
-                            if not use_case_id:
-                                # Create a default use case for standalone rules
-                                default_uc = UseCaseRepository.create(
-                                    db,
-                                    name="Default Rules Collection",
-                                    description="Default collection for standalone rules",
-                                    status="approved"
-                                )
-                                use_case_id = default_uc.id
-                                db.commit()
-                            
-                            # Create rule
-                            new_rule = RuleRepository.create(
-                                db,
-                                use_case_id=use_case_id,
-                                platform=platform,
-                                rule_name=rule_name,
-                                rule_text=rule_text,
-                                rule_format=rule_format,
-                                rule_hash=rule_hash,
-                                tags=tags_list if tags_list else None,
-                                mitre_technique_id=mitre_technique if mitre_technique else None
+                        tags_list = [t.strip() for t in tags_input.split(",")] if tags_input else []
+                        tags_list = list(
+                            dict.fromkeys(
+                                [t for t in tags_list if t]
+                                + (st.session_state.get("cr_gov_tags") or [])
                             )
-                            
-                            # Log to audit trail
-                            RuleChangeLogRepository.log_create(
-                                db, new_rule, username,
-                                reason="Created from Rules page"
-                            )
-                            
-                            st.success(f"Rule '{rule_name}' created successfully!")
-                            st.session_state["create_rule"] = False
-                            persist_session_state()
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Error creating rule: {e}")
+                        )
+                        ok_tags, err_tags = validate_rule_tags(tags_list, _bt_cfg)
+                        if not ok_tags:
+                            st.error(err_tags)
+                        else:
+                            try:
+                                parsed_refs_c = parse_ticket_refs_json(ticket_refs_raw_c)
+                                if parsed_refs_c is None:
+                                    st.error("Invalid external tickets JSON.")
+                                else:
+                                    # Compute hash with all parameters
+                                    rule_hash = compute_rule_hash(rule_text, platform, rule_format)
+                                    playbook_c = playbook_from_form(
+                                        pb_fp_c, pb_val_c, pb_esc_c, pb_ct_c
+                                    )
+                                    _ctp = st.session_state.get("cr_cti") or []
+                                    cti_refs_c = build_cti_refs_from_entry_ids(
+                                        [_cti_labels[k] for k in _ctp if k in _cti_labels],
+                                        "",
+                                    ) or None
+
+                                    # Create a default use case if needed
+                                    from db.repo import UseCaseRepository
+                                    default_ucs = UseCaseRepository.list_all(db, limit=1)
+                                    use_case_id = default_ucs[0].id if default_ucs else None
+
+                                    if not use_case_id:
+                                        # Create a default use case for standalone rules
+                                        default_uc = UseCaseRepository.create(
+                                            db,
+                                            name="Default Rules Collection",
+                                            description="Default collection for standalone rules",
+                                            status="approved"
+                                        )
+                                        use_case_id = default_uc.id
+                                        db.commit()
+
+                                    # Create rule
+                                    new_rule = RuleRepository.create(
+                                        db,
+                                        use_case_id=use_case_id,
+                                        platform=platform,
+                                        rule_name=rule_name,
+                                        rule_text=rule_text,
+                                        rule_format=rule_format,
+                                        rule_hash=rule_hash,
+                                        tags=tags_list if tags_list else None,
+                                        mitre_technique_id=mitre_technique if mitre_technique else None,
+                                        operational_status=operational_status_c,
+                                        ticket_refs=parsed_refs_c if parsed_refs_c else None,
+                                        playbook=playbook_c,
+                                        cti_refs=cti_refs_c,
+                                    )
+
+                                    # Log to audit trail
+                                    RuleChangeLogRepository.log_create(
+                                        db, new_rule, username,
+                                        reason="Created from Rules page"
+                                    )
+
+                                    st.success(f"Rule '{rule_name}' created successfully!")
+                                    st.session_state["create_rule"] = False
+                                    persist_session_state()
+                                    st.rerun()
+                            except Exception as e:
+                                st.error(f"Error creating rule: {e}")
         else:
             if st.button("➕ Create New Rule", type="primary"):
                 st.session_state["create_rule"] = True
@@ -565,7 +690,64 @@ try:
                     with col2:
                         mitre_technique = st.text_input("MITRE Technique ID", value=rule.mitre_technique_id or "", placeholder="e.g., T1059.001")
                         tags_input = st.text_input("Tags (comma-separated)", value=", ".join(rule.tags) if rule.tags else "", placeholder="e.g., endpoint, execution, powershell")
-                        tags_list = [t.strip() for t in tags_input.split(",")] if tags_input else []
+                        if _allowed_tags:
+                            st.multiselect(
+                                "Governed tags (merged with field above)",
+                                options=_allowed_tags,
+                                default=[t for t in (rule.tags or []) if t in _allowed_tags],
+                                key=f"ed_gov_tags_{rule.id}",
+                            )
+                        _OPS = ["production", "staging", "test", "pilot", "paused", "retired"]
+                        _cur_ops = getattr(rule, "operational_status", None) or "production"
+                        if _cur_ops not in _OPS:
+                            _cur_ops = "production"
+                        operational_status = st.selectbox(
+                            "Operational status",
+                            _OPS,
+                            index=_OPS.index(_cur_ops),
+                        )
+                        ticket_refs_raw = st.text_area(
+                            "External tickets (JSON)",
+                            value=json.dumps(rule.ticket_refs, indent=2) if getattr(rule, "ticket_refs", None) else "[]",
+                            height=100,
+                            help='[{"system":"jira","key":"SEC-1","url":"https://jira.example/browse/SEC-1"}]',
+                        )
+                        _pbe = normalize_playbook(getattr(rule, "playbook", None))
+                        with st.expander("📘 Detection playbook (optional)", expanded=False):
+                            pb_fp_e = st.text_area(
+                                "False positive handling",
+                                value=_pbe["false_positive"],
+                                key=f"ed_pb_fp_{rule.id}",
+                            )
+                            pb_val_e = st.text_area(
+                                "Validation steps",
+                                value=_pbe["validation"],
+                                key=f"ed_pb_val_{rule.id}",
+                            )
+                            pb_esc_e = st.text_area(
+                                "Escalation",
+                                value=_pbe["escalation"],
+                                key=f"ed_pb_esc_{rule.id}",
+                            )
+                            pb_ct_e = st.text_area(
+                                "Contacts (JSON)",
+                                value=json.dumps(_pbe["contacts"], indent=2)
+                                if _pbe["contacts"]
+                                else "[]",
+                                key=f"ed_pb_ct_{rule.id}",
+                            )
+                        if _cti_labels:
+                            _cur_cti_ids = {
+                                x.get("cti_entry_id")
+                                for x in normalize_cti_refs(getattr(rule, "cti_refs", None))
+                            }
+                            _def_cti = [k for k, v in _cti_labels.items() if v in _cur_cti_ids]
+                            st.multiselect(
+                                "CTI library sources",
+                                options=list(_cti_labels.keys()),
+                                default=_def_cti,
+                                key=f"ed_cti_{rule.id}",
+                            )
                     
                     col_submit, col_cancel = st.columns(2)
                     with col_submit:
@@ -583,40 +765,67 @@ try:
                         if not rule_name or not rule_text or not platform:
                             st.error("Rule name, query, and platform are required")
                         else:
-                            try:
-                                # Store previous state for audit log
-                                previous_state = RuleChangeLogRepository._rule_to_dict(rule)
-                                
-                                # Compute new hash
-                                rule_hash = compute_rule_hash(rule_text, platform, rule_format)
-                                
-                                # Update rule
-                                updated_rule = RuleRepository.update(
-                                    db,
-                                    rule.id,
-                                    platform=platform,
-                                    rule_name=rule_name,
-                                    rule_text=rule_text,
-                                    rule_format=rule_format,
-                                    rule_hash=rule_hash,
-                                    tags=tags_list if tags_list else None,
-                                    mitre_technique_id=mitre_technique if mitre_technique else None
+                            tags_list = [t.strip() for t in tags_input.split(",")] if tags_input else []
+                            tags_list = list(
+                                dict.fromkeys(
+                                    [t for t in tags_list if t]
+                                    + (st.session_state.get(f"ed_gov_tags_{rule.id}") or [])
                                 )
-                                
-                                # Log to audit trail
-                                if updated_rule:
-                                    RuleChangeLogRepository.log_update(
-                                        db, updated_rule, previous_state, username,
-                                        reason="Edited from Rules page"
-                                    )
-                                
-                                st.success(f"Rule '{rule_name}' updated successfully!")
-                                st.session_state["edit_rule_id"] = None
-                                st.session_state["show_edit_form"] = False
-                                persist_session_state()
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Error updating rule: {e}")
+                            )
+                            ok_tags, err_tags = validate_rule_tags(tags_list, _bt_cfg)
+                            if not ok_tags:
+                                st.error(err_tags)
+                            else:
+                                try:
+                                    parsed_refs = parse_ticket_refs_json(ticket_refs_raw)
+                                    if parsed_refs is None:
+                                        st.error("Invalid external tickets JSON (see help text).")
+                                    else:
+                                        # Store previous state for audit log
+                                        previous_state = RuleChangeLogRepository._rule_to_dict(rule)
+
+                                        # Compute new hash
+                                        rule_hash = compute_rule_hash(rule_text, platform, rule_format)
+                                        playbook_e = playbook_from_form(
+                                            pb_fp_e, pb_val_e, pb_esc_e, pb_ct_e
+                                        )
+                                        _cte = st.session_state.get(f"ed_cti_{rule.id}") or []
+                                        cti_refs_e = build_cti_refs_from_entry_ids(
+                                            [_cti_labels[k] for k in _cte if k in _cti_labels],
+                                            "",
+                                        ) or None
+
+                                        # Update rule
+                                        updated_rule = RuleRepository.update(
+                                            db,
+                                            rule.id,
+                                            platform=platform,
+                                            rule_name=rule_name,
+                                            rule_text=rule_text,
+                                            rule_format=rule_format,
+                                            rule_hash=rule_hash,
+                                            tags=tags_list if tags_list else None,
+                                            mitre_technique_id=mitre_technique if mitre_technique else None,
+                                            operational_status=operational_status,
+                                            ticket_refs=parsed_refs if parsed_refs else None,
+                                            playbook=playbook_e,
+                                            cti_refs=cti_refs_e,
+                                        )
+
+                                        # Log to audit trail
+                                        if updated_rule:
+                                            RuleChangeLogRepository.log_update(
+                                                db, updated_rule, previous_state, username,
+                                                reason="Edited from Rules page"
+                                            )
+
+                                        st.success(f"Rule '{rule_name}' updated successfully!")
+                                        st.session_state["edit_rule_id"] = None
+                                        st.session_state["show_edit_form"] = False
+                                        persist_session_state()
+                                        st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error updating rule: {e}")
                 st.divider()
             else:
                 # Normal rule display
@@ -642,6 +851,8 @@ try:
                         # Add disabled indicator to title if disabled
                         if hasattr(rule, 'enabled') and rule.enabled is not None and not rule.enabled:
                             rule_title = f"~~{rule_title}~~ ⚠️ (Disabled)"
+                        if getattr(rule, "archived_at", None):
+                            rule_title = f"{rule_title} 📦 (Archived)"
                         st.markdown(f"### {rule_title}")
                     with col_meta:
                         st.caption(f"📅 {rule.created_at.strftime('%Y-%m-%d')}")
@@ -674,6 +885,12 @@ try:
                     
                     if mitre_display:
                         st.markdown(f"**MITRE:** `{', '.join(mitre_display)}`")
+
+                    _ops_show = getattr(rule, "operational_status", None) or "production"
+                    st.markdown(f"**Operational:** `{_ops_show}`")
+                    _tlines = ticket_refs_to_display_lines(getattr(rule, "ticket_refs", None))
+                    if _tlines:
+                        st.markdown("**Tickets:** " + " · ".join(f"`{t}`" for t in _tlines))
                     
                     # Show audit results if rule has 'to_improve' tag
                     # Handle tags in different formats
@@ -879,8 +1096,10 @@ try:
                                             )
                                             db.add(review)
                                             db.commit()
+                                            db.refresh(review)
                                             db.refresh(rule)  # Refresh rule from database
-                                            
+                                            emit_mapping_changed(review, rule)
+
                                             # Log to audit trail
                                             RuleChangeLogRepository.log_update(
                                                 db, rule, previous_state, current_user,
@@ -953,8 +1172,10 @@ try:
                                             )
                                             db.add(review)
                                             db.commit()
+                                            db.refresh(review)
                                             db.refresh(rule)  # Refresh rule from database
-                                            
+                                            emit_mapping_changed(review, rule)
+
                                             # Log to audit trail
                                             RuleChangeLogRepository.log_update(
                                                 db, rule, previous_state, current_user,
@@ -992,6 +1213,52 @@ try:
                     # Preview of query
                     with st.expander("View Detection Query", expanded=False):
                         st.code(rule.rule_text, language="sql")
+                    _pbr = normalize_playbook(getattr(rule, "playbook", None))
+                    if (
+                        any(_pbr.get(k) for k in ("false_positive", "validation", "escalation"))
+                        or _pbr.get("contacts")
+                    ):
+                        with st.expander("📘 Detection playbook", expanded=False):
+                            if _pbr.get("false_positive"):
+                                st.markdown("**False positives**")
+                                st.markdown(_pbr["false_positive"])
+                            if _pbr.get("validation"):
+                                st.markdown("**Validation**")
+                                st.markdown(_pbr["validation"])
+                            if _pbr.get("escalation"):
+                                st.markdown("**Escalation**")
+                                st.markdown(_pbr["escalation"])
+                            if _pbr.get("contacts"):
+                                st.markdown("**Contacts**")
+                                st.json(_pbr["contacts"])
+                    _cti_r = normalize_cti_refs(getattr(rule, "cti_refs", None))
+                    if _cti_r:
+                        with st.expander("📚 CTI sources", expanded=False):
+                            st.json(_cti_r)
+                    with st.expander("💬 Discussion", expanded=False):
+                        for cm in CommentRepository.get_for_entity(db, "rule", rule.id):
+                            st.markdown(
+                                f"**{cm.author}** — {cm.created_at}:  \n{cm.body}"
+                            )
+                        if has_permission("update"):
+                            with st.form(f"rule_comment_{rule.id}"):
+                                cbody = st.text_area(
+                                    "Comment (@username to notify)",
+                                    key=f"rcm_{rule.id}",
+                                    height=80,
+                                    label_visibility="collapsed",
+                                )
+                                if st.form_submit_button("Post"):
+                                    if cbody.strip():
+                                        add_comment_with_notifications(
+                                            db,
+                                            entity_type="rule",
+                                            entity_id=rule.id,
+                                            use_case_id=rule.use_case_id,
+                                            author=username,
+                                            body=cbody,
+                                        )
+                                        st.rerun()
                 
                 with col_actions:
                     # Show enabled/disabled status
@@ -1153,9 +1420,3 @@ try:
                 st.markdown("---")
 finally:
     db.close()
-
-# Add admin link at bottom of sidebar
-st.sidebar.divider()
-if st.sidebar.button("⚙️ Admin", width='stretch'):
-    st.switch_page("pages/8_Admin.py")
-

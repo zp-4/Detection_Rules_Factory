@@ -9,13 +9,14 @@ from fpdf.enums import TableCellFillMode, XPos, YPos
 from src.data_ingestion import load_data, standardize_columns
 from src.mitre_engine import MitreEngine
 from src.ai_engine import AIEngine
-from services.auth import get_current_user, login, has_permission
+from services.auth import get_current_user, has_permission, require_sign_in
 from db.repo import RuleChangeLogRepository
 from db.session import SessionLocal
 from db.repo import UseCaseRepository, RuleRepository
 from db.models import RuleImplementation
 from utils.hashing import compute_rule_hash
 from utils.session_persistence import restore_session_state, persist_session_state
+from utils.app_navigation import render_app_sidebar
 from utils.ai_config import (
     get_ai_config,
     get_api_key_for_provider,
@@ -27,28 +28,8 @@ from utils.ai_config import (
 # Restore session state
 restore_session_state()
 
-# Authentication check
+require_sign_in("the Audit page")
 username = get_current_user()
-if not username:
-    st.warning("Please login to access Audit")
-    st.divider()
-    
-    # Login form
-    with st.form("login_form"):
-        st.subheader("Login")
-        login_username = st.text_input("Username", placeholder="Enter your username")
-        if st.form_submit_button("Login", type="primary"):
-            if login_username:
-                if login(login_username):
-                    st.success(f"Logged in as {login_username}")
-                    st.rerun()
-                else:
-                    st.error("Invalid username. Please check your credentials.")
-            else:
-                st.error("Please enter a username")
-    
-    st.info("💡 **Demo users:** admin, reviewer1, contributor1, reader1")
-    st.stop()
 
 # Import PDF generation function
 def generate_pdf_report(results, mitre_info):
@@ -334,6 +315,8 @@ st.markdown("""
 This tool ingests SOC detection rules and performs gap analysis against the MITRE ATT&CK framework.
 It provides **Offline** platform coverage checks and **Online** AI-based logic analysis.
 """)
+
+render_app_sidebar(username)
 
 # Sidebar
 st.sidebar.header("Configuration")
@@ -1030,6 +1013,7 @@ if all_rules_list:
                     openai_api_key,
                     provider="openai",
                     model_name=openai_model_name,
+                    team=st.session_state.get("user_team"),
                 )
             elif ai_provider == "Gemini":
                 if not gemini_api_key:
@@ -1039,6 +1023,7 @@ if all_rules_list:
                     gemini_api_key,
                     provider="gemini",
                     model_name=gemini_model_name,
+                    team=st.session_state.get("user_team"),
                 )
             elif ai_provider == "Llama (Custom LLM)":
                 if not llama_base_url:
@@ -1048,7 +1033,8 @@ if all_rules_list:
                     api_key=llama_api_key or "",
                     provider="llama",
                     base_url=llama_base_url,
-                    model_name=llama_model_name or "llama3"
+                    model_name=llama_model_name or "llama3",
+                    team=st.session_state.get("user_team"),
                 )
             else:
                 st.error("Please select an AI provider in the sidebar.")
@@ -1692,8 +1678,3 @@ else:
         "template.csv",
         "text/csv"
     )
-
-# Add admin link at bottom of sidebar
-st.sidebar.divider()
-if st.sidebar.button("⚙️ Admin", width='stretch'):
-    st.switch_page("pages/8_Admin.py")

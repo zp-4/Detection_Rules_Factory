@@ -1,212 +1,22 @@
 """Audit Trail - View and rollback rule changes."""
 import streamlit as st
-import difflib
 from datetime import datetime, timedelta, timezone
 from db.session import SessionLocal
 from db.models import RuleChangeLog, RuleImplementation
 from db.repo import RuleChangeLogRepository, RuleRepository
-from services.auth import get_current_user, has_permission, login
-
-
-def generate_colored_diff(old_text: str, new_text: str) -> str:
-    """Generate HTML diff with colored highlighting for changes."""
-    if not old_text:
-        old_text = ""
-    if not new_text:
-        new_text = ""
-    
-    old_lines = old_text.splitlines(keepends=True)
-    new_lines = new_text.splitlines(keepends=True)
-    
-    diff = difflib.unified_diff(old_lines, new_lines, lineterm='')
-    
-    html_parts = []
-    html_parts.append("""
-    <style>
-        .diff-container {
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 13px;
-            background: #1e1e1e;
-            border-radius: 8px;
-            padding: 12px;
-            overflow-x: auto;
-            line-height: 1.5;
-        }
-        .diff-line {
-            padding: 2px 8px;
-            margin: 1px 0;
-            border-radius: 3px;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-        .diff-added {
-            background-color: #1c4428;
-            color: #7ee787;
-            border-left: 3px solid #3fb950;
-        }
-        .diff-removed {
-            background-color: #4c1d1d;
-            color: #f85149;
-            border-left: 3px solid #f85149;
-        }
-        .diff-context {
-            color: #8b949e;
-        }
-        .diff-header {
-            color: #58a6ff;
-            font-weight: bold;
-            margin-bottom: 8px;
-        }
-    </style>
-    <div class="diff-container">
-    """)
-    
-    has_changes = False
-    for line in diff:
-        if line.startswith('+++') or line.startswith('---'):
-            continue
-        elif line.startswith('@@'):
-            html_parts.append(f'<div class="diff-line diff-header">{_escape_html(line.strip())}</div>')
-            has_changes = True
-        elif line.startswith('+'):
-            html_parts.append(f'<div class="diff-line diff-added">+ {_escape_html(line[1:].rstrip())}</div>')
-            has_changes = True
-        elif line.startswith('-'):
-            html_parts.append(f'<div class="diff-line diff-removed">- {_escape_html(line[1:].rstrip())}</div>')
-            has_changes = True
-        else:
-            html_parts.append(f'<div class="diff-line diff-context">  {_escape_html(line.rstrip())}</div>')
-    
-    html_parts.append('</div>')
-    
-    if not has_changes:
-        return None
-    
-    return ''.join(html_parts)
-
-
-def generate_side_by_side_diff(old_text: str, new_text: str) -> str:
-    """Generate HTML side-by-side diff with word-level highlighting."""
-    if not old_text:
-        old_text = ""
-    if not new_text:
-        new_text = ""
-    
-    old_lines = old_text.splitlines()
-    new_lines = new_text.splitlines()
-    
-    # Use SequenceMatcher for line matching
-    matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
-    
-    html_parts = []
-    html_parts.append("""
-    <style>
-        .side-diff-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 12px;
-        }
-        .side-diff-panel {
-            background: #1e1e1e;
-            border-radius: 8px;
-            padding: 12px;
-            overflow-x: auto;
-        }
-        .side-diff-title {
-            font-weight: bold;
-            margin-bottom: 10px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #333;
-        }
-        .side-diff-title-old { color: #f85149; }
-        .side-diff-title-new { color: #7ee787; }
-        .side-line {
-            padding: 2px 6px;
-            margin: 1px 0;
-            border-radius: 3px;
-            white-space: pre-wrap;
-            word-break: break-all;
-            line-height: 1.4;
-        }
-        .side-added {
-            background-color: #1c4428;
-            color: #7ee787;
-        }
-        .side-removed {
-            background-color: #4c1d1d;
-            color: #f85149;
-        }
-        .side-unchanged {
-            color: #8b949e;
-        }
-        .highlight-add {
-            background-color: #2ea043;
-            color: white;
-            padding: 1px 3px;
-            border-radius: 2px;
-        }
-        .highlight-remove {
-            background-color: #da3633;
-            color: white;
-            padding: 1px 3px;
-            border-radius: 2px;
-        }
-    </style>
-    <div class="side-diff-container">
-        <div class="side-diff-panel">
-            <div class="side-diff-title side-diff-title-old">❌ BEFORE</div>
-    """)
-    
-    # Process old lines
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag == 'equal':
-            for line in old_lines[i1:i2]:
-                html_parts.append(f'<div class="side-line side-unchanged">{_escape_html(line)}</div>')
-        elif tag == 'delete' or tag == 'replace':
-            for line in old_lines[i1:i2]:
-                html_parts.append(f'<div class="side-line side-removed">{_escape_html(line)}</div>')
-        # Insert doesn't show in old panel
-    
-    html_parts.append("""
-        </div>
-        <div class="side-diff-panel">
-            <div class="side-diff-title side-diff-title-new">✅ AFTER</div>
-    """)
-    
-    # Process new lines
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag == 'equal':
-            for line in new_lines[j1:j2]:
-                html_parts.append(f'<div class="side-line side-unchanged">{_escape_html(line)}</div>')
-        elif tag == 'insert' or tag == 'replace':
-            for line in new_lines[j1:j2]:
-                html_parts.append(f'<div class="side-line side-added">{_escape_html(line)}</div>')
-        # Delete doesn't show in new panel
-    
-    html_parts.append("""
-        </div>
-    </div>
-    """)
-    
-    return ''.join(html_parts)
-
-
-def _escape_html(text: str) -> str:
-    """Escape HTML special characters."""
-    return (text
-            .replace('&', '&amp;')
-            .replace('<', '&lt;')
-            .replace('>', '&gt;')
-            .replace('"', '&quot;')
-            .replace("'", '&#39;'))
+from services.auth import get_current_user, has_permission, require_sign_in
+from utils.app_navigation import render_app_sidebar
+from utils.diff_html import generate_colored_diff, generate_side_by_side_diff
 
 st.set_page_config(
     page_title="Audit Trail",
     page_icon="📜",
     layout="wide"
 )
+
+require_sign_in("the Audit Trail")
+username = get_current_user()
+render_app_sidebar(username)
 
 st.title("📜 Audit Trail")
 st.markdown("""
@@ -217,29 +27,6 @@ This page allows you to:
 - Filter by action type, user, or date
 - Perform rollback (restore a previous version)
 """)
-
-# Authentication check
-username = get_current_user()
-if not username:
-    st.warning("Please login to access Audit Trail")
-    st.divider()
-    
-    # Login form
-    with st.form("login_form"):
-        st.subheader("Login")
-        login_username = st.text_input("Username", placeholder="Enter your username")
-        if st.form_submit_button("Login", type="primary"):
-            if login_username:
-                if login(login_username):
-                    st.success(f"Logged in as {login_username}")
-                    st.rerun()
-                else:
-                    st.error("Invalid username.")
-            else:
-                st.error("Please enter a username")
-    
-    st.info("💡 **Demo users:** admin, reviewer1, contributor1, reader1")
-    st.stop()
 
 # Permission check - admin can do everything, reviewer can view
 can_view = has_permission("read")
@@ -593,6 +380,3 @@ finally:
     db.close()
 
 # Sidebar admin link
-st.sidebar.divider()
-if st.sidebar.button("⚙️ Admin", width='stretch'):
-    st.switch_page("pages/8_Admin.py")

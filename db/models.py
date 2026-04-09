@@ -1,10 +1,14 @@
 """SQLAlchemy models for Use Case Factory."""
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey, Float, Boolean, Index
-from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime
+from sqlalchemy.orm import declarative_base, relationship
+from datetime import datetime, timezone
 
 Base = declarative_base()
+
+
+def utcnow_naive() -> datetime:
+    """UTC now as naive datetime for DB compatibility."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class UseCase(Base):
@@ -30,8 +34,15 @@ class UseCase(Base):
     tuning_guidance = Column(Text)
     
     version = Column(Integer, default=1)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Review queue (use case in status=review)
+    review_priority = Column(Integer, default=3)  # 1 = highest
+    review_sla_days = Column(Integer, nullable=True)
+    review_assignee = Column(String(100), nullable=True)
+    review_started_at = Column(DateTime, nullable=True)
+    review_due_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=utcnow_naive)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
     
     # Relationships
     rules = relationship("RuleImplementation", back_populates="use_case", cascade="all, delete-orphan")
@@ -63,8 +74,20 @@ class RuleImplementation(Base):
     last_mapping_analysis = Column(JSON)  # Last mapping analysis results
     enabled = Column(Boolean, default=True, index=True)  # Whether the rule is enabled/active
     version = Column(Integer, default=1)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # External ITSM tickets: list of {system, key?, url?}
+    ticket_refs = Column(JSON, nullable=True)
+    # production | staging | test | pilot | paused | retired
+    operational_status = Column(String(32), default="production", index=True)
+    # FP handling, validation, escalation, contacts — JSON object
+    playbook = Column(JSON, nullable=True)
+    # CTI traceability: [{ "cti_entry_id": int, "note": str, "linked_at": str }]
+    cti_refs = Column(JSON, nullable=True)
+    # Soft-archive deprecated rules (hidden from default catalogue)
+    archived_at = Column(DateTime, nullable=True, index=True)
+    archived_by = Column(String(100), nullable=True)
+
+    created_at = Column(DateTime, default=utcnow_naive)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
     
     # Relationships
     use_case = relationship("UseCase", back_populates="rules")
@@ -86,7 +109,7 @@ class OfflineAuditResult(Base):
     rule_id = Column(Integer, ForeignKey("rule_implementations.id"), nullable=False, index=True)
     rule_version = Column(Integer, nullable=False)
     
-    run_at = Column(DateTime, default=datetime.utcnow, index=True)
+    run_at = Column(DateTime, default=utcnow_naive, index=True)
     
     # JSON results
     coverage_json = Column(JSON)  # MITRE coverage details
@@ -113,7 +136,7 @@ class AiAuditResult(Base):
     rule_version = Column(Integer, nullable=False)
     rule_hash = Column(String(64), nullable=False, index=True)  # For duplicate detection
     
-    run_at = Column(DateTime, default=datetime.utcnow, index=True)
+    run_at = Column(DateTime, default=utcnow_naive, index=True)
     
     # Justification
     justification_reason = Column(String(100))  # new_rule, major_change, periodic_review, etc.
@@ -146,7 +169,7 @@ class CoverageSnapshot(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     scope = Column(String(100))  # all, team, use_case_group
-    run_at = Column(DateTime, default=datetime.utcnow, index=True)
+    run_at = Column(DateTime, default=utcnow_naive, index=True)
     
     mitre_matrix_json = Column(JSON)  # Full MITRE matrix coverage
     coverage_percent = Column(Float)  # Overall coverage percentage
@@ -167,12 +190,31 @@ class DecisionLog(Base):
     from_status = Column(String(50))
     to_status = Column(String(50), nullable=False)
     decided_by = Column(String(100), nullable=False)
-    decided_at = Column(DateTime, default=datetime.utcnow, index=True)
+    decided_at = Column(DateTime, default=utcnow_naive, index=True)
     reason = Column(Text)
     
     __table_args__ = (
         Index('idx_decision_entity', 'entity_type', 'entity_id'),
     )
+
+
+class CtiLibraryEntry(Base):
+    """Reusable CTI source metadata (URL, pasted excerpt, file excerpt)."""
+
+    __tablename__ = "cti_library_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(512), nullable=False, index=True)
+    # url | paste | file_excerpt
+    source_kind = Column(String(32), nullable=False, index=True)
+    url = Column(String(2048), nullable=True)
+    excerpt_text = Column(Text, nullable=True)
+    # vendor, report_type, published_at, original_filename, etc.
+    source_metadata = Column("metadata", JSON, nullable=True)
+    tags = Column(JSON, nullable=True)
+    created_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=utcnow_naive)
+    updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
 
 class Comment(Base):
@@ -185,15 +227,33 @@ class Comment(Base):
     use_case_id = Column(Integer, ForeignKey("use_cases.id"), nullable=True, index=True)
     
     author = Column(String(100), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=utcnow_naive, index=True)
     body = Column(Text, nullable=False)
-    
+    mentions = Column(JSON, nullable=True)  # list of usernames from @mentions
+
     # Relationships
     use_case = relationship("UseCase", back_populates="comments")
     
     __table_args__ = (
         Index('idx_comment_entity', 'entity_type', 'entity_id'),
     )
+
+
+class UserNotification(Base):
+    """In-app notifications (e.g. @mentions on comments)."""
+
+    __tablename__ = "user_notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(100), nullable=False, index=True)
+    message = Column(Text, nullable=False)
+    read_at = Column(DateTime, nullable=True, index=True)
+    created_at = Column(DateTime, default=utcnow_naive, index=True)
+    entity_type = Column(String(50), nullable=True)
+    entity_id = Column(Integer, nullable=True)
+    comment_id = Column(Integer, nullable=True)
+
+    __table_args__ = (Index("idx_notif_user_unread", "username", "read_at"),)
 
 
 class QuotaUsage(Base):
@@ -219,7 +279,7 @@ class AiLock(Base):
     rule_id = Column(Integer, nullable=False, index=True)
     rule_hash = Column(String(64), nullable=False, index=True)
     locked_by = Column(String(100))
-    locked_at = Column(DateTime, default=datetime.utcnow, index=True)
+    locked_at = Column(DateTime, default=utcnow_naive, index=True)
     expires_at = Column(DateTime, nullable=False, index=True)
     status = Column(String(50), default="RUNNING")  # RUNNING, COMPLETED, FAILED
     
@@ -236,7 +296,7 @@ class MappingReview(Base):
     id = Column(Integer, primary_key=True, index=True)
     rule_id = Column(Integer, ForeignKey("rule_implementations.id"), nullable=False, index=True)
     
-    reviewed_at = Column(DateTime, default=datetime.utcnow, index=True)
+    reviewed_at = Column(DateTime, default=utcnow_naive, index=True)
     reviewed_by = Column(String(100), nullable=False)  # Username
     
     # Previous mapping
@@ -271,7 +331,7 @@ class RuleChangeLog(Base):
     rule_id = Column(Integer, ForeignKey("rule_implementations.id"), nullable=True, index=True)  # Nullable for deleted rules
     
     # Change metadata
-    changed_at = Column(DateTime, default=datetime.utcnow, index=True)
+    changed_at = Column(DateTime, default=utcnow_naive, index=True)
     changed_by = Column(String(100), nullable=False)  # Username who made the change
     
     # Action type
@@ -301,4 +361,22 @@ class RuleChangeLog(Base):
         Index('idx_changelog_changed_at', 'changed_at'),
         Index('idx_changelog_action', 'action'),
         Index('idx_changelog_changed_by', 'changed_by'),
+    )
+
+
+class ConfigAuditLog(Base):
+    """Append-only log of admin configuration changes (platform flags, quotas, etc.)."""
+
+    __tablename__ = "config_audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    occurred_at = Column(DateTime, default=utcnow_naive, index=True)
+    actor_username = Column(String(100), nullable=False, index=True)
+    category = Column(String(64), nullable=False, index=True)
+    action = Column(String(128), nullable=False)
+    detail = Column(JSON, nullable=True)
+
+    __table_args__ = (
+        Index("idx_cfg_audit_occurred", "occurred_at"),
+        Index("idx_cfg_audit_category", "category"),
     )
