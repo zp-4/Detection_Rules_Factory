@@ -68,3 +68,5 @@ Desktop.ini
 
 # Local contributor roadmap (not for version control)
 FEATURE_ROADMAP_LOCAL.md
+config/saved_views.yaml
+config/onboarding_state.yaml
