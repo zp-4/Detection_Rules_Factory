@@ -37,8 +37,10 @@ code, pre, .stCodeBlock {
 
 /* Main column */
 .main .block-container {
-  padding-top: 1.75rem !important;
-  padding-bottom: 2.5rem !important;
+  padding-top: 0.85rem !important;
+  padding-bottom: 1.1rem !important;
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
   max-width: min(1200px, 96vw) !important;
 }
 
@@ -155,8 +157,8 @@ section.main [data-testid="baseButton-primary"]:hover {
   background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 40%, #f8fafc 100%);
   border: 1px solid #ccfbf1;
   border-radius: 16px;
-  padding: 1.75rem 1.5rem 1.5rem 1.5rem;
-  margin-bottom: 1.5rem;
+  padding: 1.15rem 1.2rem 1.1rem 1.2rem;
+  margin-bottom: 1rem;
   box-shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
 }
 .drf-hero-kicker {
@@ -233,6 +235,33 @@ section.main [data-testid="baseButton-primary"]:hover {
   border-color: #e2e8f0 !important;
   background: #ffffff !important;
   box-shadow: 0 1px 8px rgba(15, 23, 42, 0.04) !important;
+  padding: 0.65rem 0.85rem !important;
+}
+</style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def apply_login_page_styles() -> None:
+    """Tighter chrome + wide sign-in card (call after apply_global_styles on 0_Login only)."""
+    st.markdown(
+        """
+<style>
+/* Login: use full width of main area, minimal outer padding */
+section.main div.block-container {
+  padding-top: 0.35rem !important;
+  padding-bottom: 0.5rem !important;
+  padding-left: 0.75rem !important;
+  padding-right: 0.75rem !important;
+  max-width: 100% !important;
+}
+/* Wider bordered card on login */
+section.main [data-testid="stVerticalBlockBorderWrapper"] {
+  max-width: min(720px, 96vw) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding: 0.85rem 1.25rem 1rem 1.25rem !important;
 }
 </style>
         """,

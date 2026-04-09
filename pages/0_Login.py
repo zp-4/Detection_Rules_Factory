@@ -1,4 +1,4 @@
-"""Dedicated sign-in portal (centered layout)."""
+"""Dedicated sign-in portal (wide layout + compact padding)."""
 import sys
 import os
 
@@ -11,7 +11,7 @@ if sys.platform == "win32":
 
 import streamlit as st
 from utils.session_persistence import restore_session_state
-from utils.streamlit_ui import apply_global_styles
+from utils.streamlit_ui import apply_global_styles, apply_login_page_styles
 from services.auth import (
     get_current_user,
     login,
@@ -25,31 +25,34 @@ restore_session_state()
 st.set_page_config(
     page_title="Sign in — Detection Rules Factory",
     page_icon="🔐",
-    layout="centered",
+    layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 apply_global_styles()
+apply_login_page_styles()
 
 username = get_current_user()
 
 if username:
-    st.success(f"Signed in as **{username}**")
-    st.caption(
-        f"Role: **{st.session_state.get('user_role', 'N/A')}** · "
-        f"Team: **{st.session_state.get('user_team', 'N/A')}**"
-    )
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("Go to home", type="primary", use_container_width=True):
-            st.switch_page("app.py")
-    with c2:
-        if st.button("Sign out", use_container_width=True):
-            logout()
-            st.rerun()
+    _, mid_signed, _ = st.columns([0.12, 1, 0.12])
+    with mid_signed:
+        st.success(f"Signed in as **{username}**")
+        st.caption(
+            f"Role: **{st.session_state.get('user_role', 'N/A')}** · "
+            f"Team: **{st.session_state.get('user_team', 'N/A')}**"
+        )
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("Go to home", type="primary", use_container_width=True):
+                st.switch_page("app.py")
+        with c2:
+            if st.button("Sign out", use_container_width=True):
+                logout()
+                st.rerun()
     st.stop()
 
-_, mid, _ = st.columns([1, 1.15, 1])
+_, mid, _ = st.columns([0.12, 1, 0.12])
 with mid:
     with st.container(border=True):
         st.markdown("## Detection Rules Factory")
@@ -74,14 +77,14 @@ with mid:
                 else:
                     st.error("Invalid username or password.")
 
-cfg = load_rbac_config()
-known = sorted(cfg.get("users", {}).keys())
-if known:
-    with st.expander("Demo accounts"):
-        st.markdown("You can sign in as: " + ", ".join(f"`{u}`" for u in known))
+    cfg = load_rbac_config()
+    known = sorted(cfg.get("users", {}).keys())
+    if known:
+        with st.expander("Demo accounts"):
+            st.markdown("You can sign in as: " + ", ".join(f"`{u}`" for u in known))
 
-st.caption(
-    "Accounts without `password_hash` in RBAC: username only. "
-    "Use `python scripts/hash_password.py` to set passwords. "
-    "Prefer SSO for production."
-)
+    st.caption(
+        "Accounts without `password_hash` in RBAC: username only. "
+        "Use `python scripts/hash_password.py` to set passwords. "
+        "Prefer SSO for production."
+    )
