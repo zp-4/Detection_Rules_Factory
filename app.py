@@ -48,6 +48,7 @@ if _banner:
 for finding in security_findings():
     st.warning(f"Security posture: {finding}")
 
+stats = load_home_dashboard_stats(username)
 _has_import = stats.n_rules > 0
 _has_audit = stats.n_audits_total > 0
 _onb = compute_progress(username=username, has_import=_has_import, has_audit=_has_audit)
@@ -82,8 +83,6 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
-stats = load_home_dashboard_stats(username)
 role_permissions = [str(p) for p in ROLES.get(str(role), [])]
 safe_badges = "".join(
     f'<span class="drf-badge">{html.escape(p)}</span>' for p in role_permissions
