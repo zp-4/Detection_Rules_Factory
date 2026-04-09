@@ -241,6 +241,19 @@ section.main [data-testid="baseButton-primary"]:hover {
   border-color: rgba(45, 212, 191, 0.4) !important;
   color: #f8fafc !important;
 }
+/* Sign out — tertiary at bottom */
+[data-testid="stSidebar"] [data-testid="baseButton-tertiary"] {
+  background: transparent !important;
+  border: none !important;
+  color: #94a3b8 !important;
+  font-size: 0.85rem !important;
+  padding: 0.3rem 0.5rem !important;
+  opacity: 0.95;
+}
+[data-testid="stSidebar"] [data-testid="baseButton-tertiary"]:hover {
+  color: #f1f5f9 !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
 
 [data-testid="stSidebar"] [data-baseweb="divider"] {
   background: rgba(148, 163, 184, 0.15) !important;
@@ -331,6 +344,28 @@ section.main [data-testid="baseButton-primary"]:hover {
   border: none !important;
   font-size: 1.5rem !important;
   margin-bottom: 0.25rem !important;
+}
+
+/* Compact identity strip (sidebar) — no tall success box */
+.drf-sidebar-ident {
+  padding: 0.35rem 0.45rem;
+  margin-bottom: 0.25rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+.drf-sidebar-ident-name {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #f8fafc;
+  line-height: 1.3;
+}
+.drf-sidebar-ident-meta {
+  display: block;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  margin-top: 0.15rem;
 }
 
 /* Bordered containers (st.container(border=True)) */

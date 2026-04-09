@@ -1,12 +1,14 @@
-"""Grouped navigation for the Streamlit app (sidebar + home quick links)."""
+"""Grouped navigation: sidebar roles (usr / conf) + workspace sections."""
 
 from __future__ import annotations
+
+import html
 
 import streamlit as st
 
 from utils.streamlit_ui import apply_global_styles
 
-# Material Symbols (Streamlit native :material/...:)
+# Material Symbols (Streamlit :material/...:)
 _NAV_MATERIAL: dict[str, str] = {
     "ws": ":material/workspaces:",
     "rules": ":material/view_kanban:",
@@ -31,9 +33,10 @@ _NAV_MATERIAL: dict[str, str] = {
 }
 
 # (group title, [(label, page path, suffix), ...])
+# Order: métier d’abord, puis usr (compte), puis conf (plateforme / IA / admin)
 _NAV_GROUPS: list[tuple[str, list[tuple[str, str, str]]]] = [
     (
-        "Daily work",
+        "Workspace",
         [
             ("My workspace", "pages/10_My_Workspace.py", "ws"),
             ("Rules catalogue", "pages/1_Use_Cases.py", "rules"),
@@ -80,11 +83,16 @@ _NAV_GROUPS: list[tuple[str, list[tuple[str, str, str]]]] = [
         ],
     ),
     (
-        "Configuration & compte",
+        "usr · Compte",
+        [
+            ("My profile", "pages/9_My_Profile.py", "profile"),
+        ],
+    ),
+    (
+        "conf · Configuration",
         [
             ("AI configuration", "pages/0_AI_Config.py", "ai"),
             ("Administration", "pages/8_Admin.py", "admin"),
-            ("My profile", "pages/9_My_Profile.py", "profile"),
         ],
     ),
 ]
@@ -123,7 +131,7 @@ def _link_label(label: str, suffix: str, unread_notifications: int) -> str:
 
 
 def render_sidebar_navigation(username: str, unread_notifications: int = 0) -> None:
-    """Expanders per group + page_link (no nav buttons)."""
+    """Expanders by role/section + page_link."""
     for idx, (group_title, items) in enumerate(_NAV_GROUPS):
         with st.sidebar.expander(group_title, expanded=(idx == 0)):
             for label, path, suffix in items:
@@ -136,10 +144,7 @@ def render_sidebar_navigation(username: str, unread_notifications: int = 0) -> N
 
 
 def render_app_sidebar(username: str, unread_notifications: int | None = None) -> None:
-    """
-    Full sidebar: maintenance, identity, sign out, then grouped navigation.
-    Call once per page after the user is authenticated.
-    """
+    """Sidebar: brand, compact identity, menus only, Sign out en bas."""
     apply_global_styles()
     from services.auth import logout
     from services.feature_flags import maintenance_message
@@ -157,29 +162,43 @@ def render_app_sidebar(username: str, unread_notifications: int | None = None) -
     _msg = maintenance_message()
     if _msg:
         st.sidebar.warning(_msg)
-    st.sidebar.success(f"Logged in as: **{username}**")
-    st.sidebar.caption(
-        f"Role **{st.session_state.get('user_role', 'N/A')}** · "
-        f"Team **{st.session_state.get('user_team', 'N/A')}**"
+
+    role = st.session_state.get("user_role", "N/A")
+    team = st.session_state.get("user_team", "N/A")
+    safe_u = html.escape(str(username))
+    safe_r = html.escape(str(role))
+    safe_t = html.escape(str(team))
+    st.sidebar.markdown(
+        f'<div class="drf-sidebar-ident">'
+        f'<span class="drf-sidebar-ident-name">{safe_u}</span>'
+        f'<span class="drf-sidebar-ident-meta">{safe_r} · {safe_t}</span>'
+        f"</div>",
+        unsafe_allow_html=True,
     )
+
+    st.sidebar.divider()
+    render_sidebar_navigation(username, unread_notifications)
+
+    st.sidebar.divider()
     if st.sidebar.button(
         "Sign out",
         key="sb_signout_global",
         icon=":material/logout:",
-        type="secondary",
+        type="tertiary",
         use_container_width=True,
     ):
         logout()
         st.rerun()
-    st.sidebar.divider()
-    render_sidebar_navigation(username, unread_notifications)
 
 
 def render_home_quick_links(unread_notifications: int = 0) -> None:
-    """Home: same groups as sidebar — expanders + page_link (no button grid)."""
+    """Dashboard: même grille que la sidebar, libellés de rôle explicites."""
+    st.markdown("### Dashboard")
+    st.caption(
+        "Navigation alignée sur la sidebar : métier (Workspace → Imports), "
+        "puis **usr** (compte), puis **conf** (configuration plateforme / IA)."
+    )
     with st.container(border=True):
-        st.markdown("### Quick access")
-        st.caption("Same groups as the sidebar — links, not buttons.")
         for idx, (title, items) in enumerate(_NAV_GROUPS):
             expanded = idx == 0
             with st.expander(title, expanded=expanded):

@@ -49,8 +49,7 @@ st.markdown(
   <p class="drf-hero-kicker">SOC detection platform</p>
   <h1 class="drf-hero-title">Detection Rules Factory</h1>
   <p class="drf-hero-lead">
-    Unified rule catalogue, MITRE ATT&amp;CK coverage, CTI workflows, and governance —
-    use the sidebar or the shortcuts below.
+    Catalogue, MITRE, CTI, lifecycle — navigation by area (Workspace, usr, conf) in the sidebar and dashboard below.
   </p>
 </div>
     """,
