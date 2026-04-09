@@ -6,7 +6,7 @@ import streamlit as st
 
 from utils.streamlit_ui import apply_global_styles
 
-# Material Symbols (Streamlit native :material/...:) — professional, monochrome
+# Material Symbols (Streamlit native :material/...:)
 _NAV_MATERIAL: dict[str, str] = {
     "ws": ":material/workspaces:",
     "rules": ":material/view_kanban:",
@@ -27,9 +27,10 @@ _NAV_MATERIAL: dict[str, str] = {
     "ai": ":material/tune:",
     "git": ":material/cloud_download:",
     "admin": ":material/admin_panel_settings:",
+    "profile": ":material/person:",
 }
 
-# (label, page path, stable key suffix)
+# (group title, [(label, page path, suffix), ...])
 _NAV_GROUPS: list[tuple[str, list[tuple[str, str, str]]]] = [
     (
         "Daily work",
@@ -67,17 +68,23 @@ _NAV_GROUPS: list[tuple[str, list[tuple[str, str, str]]]] = [
         ],
     ),
     (
-        "Engineering & AI",
+        "Rule drafting",
         [
             ("Rule draft assistant", "pages/19_Rule_Draft_Assistant.py", "draft"),
-            ("AI configuration", "pages/0_AI_Config.py", "ai"),
         ],
     ),
     (
-        "Operations & admin",
+        "Imports",
         [
             ("Git Sigma import", "pages/18_Git_Sigma_Import.py", "git"),
+        ],
+    ),
+    (
+        "Configuration & compte",
+        [
+            ("AI configuration", "pages/0_AI_Config.py", "ai"),
             ("Administration", "pages/8_Admin.py", "admin"),
+            ("My profile", "pages/9_My_Profile.py", "profile"),
         ],
     ),
 ]
@@ -109,32 +116,23 @@ def _icon_for_suffix(suffix: str) -> str:
     return _NAV_MATERIAL.get(suffix, ":material/chevron_right:")
 
 
+def _link_label(label: str, suffix: str, unread_notifications: int) -> str:
+    if suffix == "collab":
+        return _collab_label(unread_notifications)
+    return label
+
+
 def render_sidebar_navigation(username: str, unread_notifications: int = 0) -> None:
-    """Grouped page links (used under the app chrome)."""
-    st.sidebar.markdown("### Navigate")
-    for title, items in _NAV_GROUPS:
-        st.sidebar.caption(title.upper())
-        for label, path, suffix in items:
-            display = label
-            if suffix == "collab":
-                display = _collab_label(unread_notifications)
-            key = f"sb_nav_{suffix}"
-            if st.sidebar.button(
-                display,
-                key=key,
-                icon=_icon_for_suffix(suffix),
-                use_container_width=True,
-            ):
-                st.switch_page(path)
-    st.sidebar.divider()
-    st.sidebar.caption("Account")
-    if st.sidebar.button(
-        "My profile",
-        key="sb_nav_profile",
-        icon=":material/person:",
-        use_container_width=True,
-    ):
-        st.switch_page("pages/9_My_Profile.py")
+    """Expanders per group + page_link (no nav buttons)."""
+    for idx, (group_title, items) in enumerate(_NAV_GROUPS):
+        with st.sidebar.expander(group_title, expanded=(idx == 0)):
+            for label, path, suffix in items:
+                st.page_link(
+                    path,
+                    label=_link_label(label, suffix, unread_notifications),
+                    icon=_icon_for_suffix(suffix),
+                    use_container_width=True,
+                )
 
 
 def render_app_sidebar(username: str, unread_notifications: int | None = None) -> None:
@@ -177,24 +175,17 @@ def render_app_sidebar(username: str, unread_notifications: int | None = None) -
 
 
 def render_home_quick_links(unread_notifications: int = 0) -> None:
-    """Home page: expanders instead of a wall of buttons."""
+    """Home: same groups as sidebar — expanders + page_link (no button grid)."""
     with st.container(border=True):
         st.markdown("### Quick access")
-        st.caption("Grouped shortcuts — same destinations as the sidebar.")
+        st.caption("Same groups as the sidebar — links, not buttons.")
         for idx, (title, items) in enumerate(_NAV_GROUPS):
             expanded = idx == 0
             with st.expander(title, expanded=expanded):
-                n = len(items)
-                ncols = min(4, max(1, n))
-                cols = st.columns(ncols)
-                for i, (label, path, suffix) in enumerate(items):
-                    display = _collab_label(unread_notifications) if suffix == "collab" else label
-                    key = f"home_{suffix}"
-                    with cols[i % ncols]:
-                        if st.button(
-                            display,
-                            key=key,
-                            icon=_icon_for_suffix(suffix),
-                            use_container_width=True,
-                        ):
-                            st.switch_page(path)
+                for label, path, suffix in items:
+                    st.page_link(
+                        path,
+                        label=_link_label(label, suffix, unread_notifications),
+                        icon=_icon_for_suffix(suffix),
+                        use_container_width=True,
+                    )

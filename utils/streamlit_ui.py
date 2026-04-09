@@ -170,6 +170,23 @@ section.main [data-testid="baseButton-primary"]:hover {
   padding-bottom: 0.75rem !important;
 }
 
+/* Sidebar: expander groups (nav) — dark chrome, tight */
+[data-testid="stSidebar"] .streamlit-expander {
+  margin-bottom: 0.3rem !important;
+  border: 1px solid rgba(148, 163, 184, 0.12) !important;
+  border-radius: 10px !important;
+  background: rgba(0, 0, 0, 0.12) !important;
+}
+[data-testid="stSidebar"] .streamlit-expanderHeader {
+  background: transparent !important;
+  color: #e2e8f0 !important;
+  font-size: 0.88rem !important;
+}
+[data-testid="stSidebar"] .streamlit-expanderContent {
+  padding-top: 0.25rem !important;
+  padding-bottom: 0.35rem !important;
+}
+
 [data-testid="stSidebar"] [data-testid="baseButton-primary"],
 [data-testid="stSidebar"] [data-testid="baseButton-secondary"] {
   border-radius: 10px !important;
